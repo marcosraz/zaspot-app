@@ -11,12 +11,15 @@ legacy-peer-deps=true
 ```
 
 ### 2. New Architecture (newArchEnabled)
-**Problem:** `newArchEnabled: true` in `app.json` kann Build-Fehler verursachen.
+**Problem:** `react-native-worklets` (benötigt von `react-native-reanimated`) erfordert die neue Architektur.
 
-**Lösung:** Auf `false` setzen bis die neue Architektur stabil ist:
+**Lösung:** MUSS auf `true` bleiben:
 ```json
-"newArchEnabled": false
+"newArchEnabled": true
 ```
+
+**WICHTIG:** Nicht auf `false` setzen, sonst schlägt der Build fehl mit:
+`Task :react-native-worklets:assertNewArchitectureEnabledTask FAILED`
 
 ### 3. react-native-worklets Version
 **Problem:** Falsche Version von `react-native-worklets` verursacht Build-Fehler.
