@@ -1,8 +1,8 @@
 /**
- * Spot Prices Screen - Electricity price chart with daily/weekly/monthly views
+ * Spot Prices Screen - Real electricity prices from OTE API
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   Dimensions,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,100 +20,124 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import {
+  fetchSpotPrices,
+  fetchSpotPricesRange,
+  getCurrentSlot,
+  getPriceColor,
+  DailyPrices,
+} from '../../lib/spotPrices';
 
 type TimeRange = 'today' | 'week' | 'month';
-
-// Mock data - will be replaced with OTE API call
-const generateMockPrices = (range: TimeRange) => {
-  const now = new Date();
-  const prices = [];
-
-  const count = range === 'today' ? 24 : range === 'week' ? 7 : 30;
-
-  for (let i = 0; i < count; i++) {
-    const basePrice = 2500 + Math.random() * 2000;
-    const hour = range === 'today' ? i : 12;
-    // Simulate typical price patterns
-    const hourFactor = Math.sin((hour - 14) * Math.PI / 12) * 500;
-    prices.push({
-      time: range === 'today'
-        ? `${i.toString().padStart(2, '0')}:00`
-        : range === 'week'
-        ? ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'][i]
-        : `${i + 1}.`,
-      price: Math.max(500, basePrice + hourFactor),
-    });
-  }
-  return prices;
-};
-
-const mockPrices = {
-  today: generateMockPrices('today'),
-  week: generateMockPrices('week'),
-  month: generateMockPrices('month'),
-};
 
 export default function SpotPricesScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [refreshing, setRefreshing] = useState(false);
-  const [prices, setPrices] = useState(mockPrices);
+  const [loading, setLoading] = useState(true);
   const [unit, setUnit] = useState<'mwh' | 'kwh'>('kwh');
+  const [error, setError] = useState<string | null>(null);
 
-  const currentPrices = prices[timeRange];
-  const priceValues = currentPrices.map(p => p.price / (unit === 'kwh' ? 1000 : 1));
+  // Data states
+  const [dailyData, setDailyData] = useState<DailyPrices | null>(null);
+  const [weeklyData, setWeeklyData] = useState<{ date: string; avgPrice: number }[]>([]);
+  const [monthlyData, setMonthlyData] = useState<{ date: string; avgPrice: number }[]>([]);
 
-  const stats = {
-    current: priceValues[new Date().getHours()] || priceValues[0],
-    average: priceValues.reduce((a, b) => a + b, 0) / priceValues.length,
-    lowest: Math.min(...priceValues),
-    highest: Math.max(...priceValues),
-    lowestIndex: priceValues.indexOf(Math.min(...priceValues)),
-  };
+  const loadData = useCallback(async () => {
+    setError(null);
+    try {
+      // Load today's data
+      const today = await fetchSpotPrices(new Date(), 'PT60M');
+      if (today) {
+        setDailyData(today);
+      }
 
-  const screenWidth = Dimensions.get('window').width;
+      // Load weekly data
+      const weekly = await fetchSpotPricesRange(7);
+      setWeeklyData(weekly);
+
+      // Load monthly data (last 30 days)
+      const monthly = await fetchSpotPricesRange(30);
+      setMonthlyData(monthly);
+    } catch (err) {
+      console.error('Error loading spot prices:', err);
+      setError('Nepodařilo se načíst ceny');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // TODO: Fetch from OTE API
-    setTimeout(() => {
-      setPrices({
-        today: generateMockPrices('today'),
-        week: generateMockPrices('week'),
-        month: generateMockPrices('month'),
-      });
-      setRefreshing(false);
-    }, 1000);
+    await loadData();
+    setRefreshing(false);
   };
 
-  const getPriceColor = (price: number) => {
-    const kwhPrice = unit === 'mwh' ? price / 1000 : price;
-    if (kwhPrice < 2) return Colors.spotPrice.veryLow;
-    if (kwhPrice < 3) return Colors.spotPrice.low;
-    if (kwhPrice < 4) return Colors.spotPrice.medium;
-    if (kwhPrice < 5) return Colors.spotPrice.high;
-    return Colors.spotPrice.veryHigh;
+  // Get data for current view
+  const getChartData = () => {
+    if (timeRange === 'today' && dailyData) {
+      const validPrices = dailyData.prices.filter(p => p.price > 0);
+      return {
+        labels: validPrices.filter((_, i) => i % 4 === 0).map(p => p.time),
+        values: validPrices.map(p => unit === 'kwh' ? p.priceKwh : p.price),
+      };
+    } else if (timeRange === 'week') {
+      return {
+        labels: weeklyData.map(d => {
+          const date = new Date(d.date);
+          return ['Ne', 'Po', 'Út', 'St', 'Čt', 'Pá', 'So'][date.getDay()];
+        }),
+        values: weeklyData.map(d => unit === 'kwh' ? d.avgPrice : d.avgPrice * 1000),
+      };
+    } else {
+      // Monthly - show every 5th day
+      return {
+        labels: monthlyData.filter((_, i) => i % 5 === 0).map(d => {
+          const date = new Date(d.date);
+          return `${date.getDate()}.`;
+        }),
+        values: monthlyData.map(d => unit === 'kwh' ? d.avgPrice : d.avgPrice * 1000),
+      };
+    }
   };
 
-  // Prepare chart data - show fewer labels for readability
-  const labelStep = timeRange === 'today' ? 4 : timeRange === 'week' ? 1 : 5;
-  const chartLabels = currentPrices
-    .map((p, i) => i % labelStep === 0 ? p.time : '')
-    .filter((_, i) => i % labelStep === 0 || timeRange === 'week');
+  const chartData = getChartData();
+  const screenWidth = Dimensions.get('window').width;
 
-  const chartData = {
-    labels: timeRange === 'week'
-      ? currentPrices.map(p => p.time)
-      : currentPrices.filter((_, i) => i % labelStep === 0).map(p => p.time),
-    datasets: [{
-      data: timeRange === 'week'
-        ? priceValues
-        : priceValues.filter((_, i) => i % labelStep === 0),
-      color: () => Colors.brand.accentGreen,
-      strokeWidth: 2,
-    }],
+  // Stats
+  const stats = dailyData?.stats || {
+    current: 0,
+    average: 0,
+    lowest: 0,
+    highest: 0,
+    lowestSlot: 0,
+    highestSlot: 0,
   };
+
+  const displayStats = {
+    current: unit === 'kwh' ? stats.current : stats.current * 1000,
+    average: unit === 'kwh' ? stats.average : stats.average * 1000,
+    lowest: unit === 'kwh' ? stats.lowest : stats.lowest * 1000,
+    highest: unit === 'kwh' ? stats.highest : stats.highest * 1000,
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.brand.accentGreen} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            Načítám ceny z OTE...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -135,6 +160,14 @@ export default function SpotPricesScreen() {
             {t.spotPrices.subtitle}
           </Text>
         </View>
+
+        {/* Error Message */}
+        {error && (
+          <View style={[styles.errorCard, { backgroundColor: '#FEE2E2' }]}>
+            <Ionicons name="warning" size={20} color="#DC2626" />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
 
         {/* Time Range Selector */}
         <View style={[styles.rangeSelector, { backgroundColor: colors.surface }]}>
@@ -185,78 +218,94 @@ export default function SpotPricesScreen() {
 
         {/* Current Price Card */}
         <View style={[styles.currentPriceCard, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.currentPriceLabel, { color: colors.textSecondary }]}>
-            {t.spotPrices.current}
-          </Text>
+          <View style={styles.currentPriceHeader}>
+            <Text style={[styles.currentPriceLabel, { color: colors.textSecondary }]}>
+              {t.spotPrices.current}
+            </Text>
+            <View style={[styles.liveBadge, { backgroundColor: Colors.brand.accentGreen + '20' }]}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          </View>
           <View style={styles.currentPriceRow}>
             <Text style={[styles.currentPriceValue, { color: getPriceColor(stats.current) }]}>
-              {stats.current.toFixed(2)}
+              {displayStats.current.toFixed(2)}
             </Text>
             <Text style={[styles.currentPriceUnit, { color: colors.textSecondary }]}>
               {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
             </Text>
           </View>
+          <Text style={[styles.currentSlot, { color: colors.textMuted }]}>
+            Slot {getCurrentSlot() + 1}/96 ({dailyData?.prices[getCurrentSlot()]?.time || '--:--'})
+          </Text>
         </View>
 
         {/* Chart */}
-        <View style={[styles.chartContainer, { backgroundColor: colors.surface }]}>
-          <LineChart
-            data={chartData}
-            width={screenWidth - Layout.spacing.md * 4}
-            height={220}
-            chartConfig={{
-              backgroundColor: colors.surface,
-              backgroundGradientFrom: colors.surface,
-              backgroundGradientTo: colors.surface,
-              decimalPlaces: 2,
-              color: (opacity = 1) => Colors.brand.accentGreen,
-              labelColor: () => colors.textSecondary,
-              style: {
+        {chartData.values.length > 0 && (
+          <View style={[styles.chartContainer, { backgroundColor: colors.surface }]}>
+            <LineChart
+              data={{
+                labels: chartData.labels,
+                datasets: [{
+                  data: chartData.values.length > 0 ? chartData.values : [0],
+                  color: () => Colors.brand.accentGreen,
+                  strokeWidth: 2,
+                }],
+              }}
+              width={screenWidth - Layout.spacing.md * 4}
+              height={220}
+              chartConfig={{
+                backgroundColor: colors.surface,
+                backgroundGradientFrom: colors.surface,
+                backgroundGradientTo: colors.surface,
+                decimalPlaces: unit === 'kwh' ? 2 : 0,
+                color: (opacity = 1) => Colors.brand.accentGreen,
+                labelColor: () => colors.textSecondary,
+                style: {
+                  borderRadius: Layout.borderRadius.lg,
+                },
+                propsForDots: {
+                  r: '3',
+                  strokeWidth: '2',
+                  stroke: Colors.brand.accentGreen,
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '',
+                  stroke: isDark ? colors.border : '#E5E7EB',
+                  strokeWidth: 0.5,
+                },
+              }}
+              bezier
+              style={{
+                marginVertical: Layout.spacing.sm,
                 borderRadius: Layout.borderRadius.lg,
-              },
-              propsForDots: {
-                r: '4',
-                strokeWidth: '2',
-                stroke: Colors.brand.accentGreen,
-              },
-              propsForBackgroundLines: {
-                strokeDasharray: '',
-                stroke: isDark ? colors.border : '#E5E7EB',
-                strokeWidth: 0.5,
-              },
-            }}
-            bezier
-            style={{
-              marginVertical: Layout.spacing.sm,
-              borderRadius: Layout.borderRadius.lg,
-            }}
-            withInnerLines={true}
-            withOuterLines={false}
-            withHorizontalLabels={true}
-            withVerticalLabels={true}
-            fromZero={false}
-          />
-        </View>
+              }}
+              withInnerLines={true}
+              withOuterLines={false}
+              fromZero={false}
+            />
+          </View>
+        )}
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-down" size={24} color={Colors.spotPrice.veryLow} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.veryLow }]}>
-              {stats.lowest.toFixed(2)}
+              {displayStats.lowest.toFixed(2)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.lowest}
             </Text>
             <Text style={[styles.statTime, { color: colors.textSecondary }]}>
-              {currentPrices[stats.lowestIndex]?.time}
+              {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
             </Text>
           </View>
 
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="analytics" size={24} color="#3B82F6" />
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {stats.average.toFixed(2)}
+              {displayStats.average.toFixed(2)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.average}
@@ -266,10 +315,13 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-up" size={24} color={Colors.spotPrice.high} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.high }]}>
-              {stats.highest.toFixed(2)}
+              {displayStats.highest.toFixed(2)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.highest}
+            </Text>
+            <Text style={[styles.statTime, { color: colors.textSecondary }]}>
+              {dailyData?.prices[stats.highestSlot]?.time || '--:--'}
             </Text>
           </View>
         </View>
@@ -283,27 +335,20 @@ export default function SpotPricesScreen() {
             </Text>
           </View>
           <Text style={[styles.bestTimeValue, { color: colors.text }]}>
-            {currentPrices[stats.lowestIndex]?.time}
-            {timeRange === 'today' && ` - ${String(stats.lowestIndex + 1).padStart(2, '0')}:00`}
+            {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
           </Text>
           <Text style={[styles.bestTimePrice, { color: Colors.brand.accentGreen }]}>
-            {stats.lowest.toFixed(2)} {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
+            {displayStats.lowest.toFixed(2)} {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
           </Text>
         </View>
 
-        {/* Price Alert Button */}
-        <TouchableOpacity style={[styles.alertButton, { backgroundColor: colors.surface }]}>
-          <Ionicons name="notifications-outline" size={24} color={Colors.brand.accentGreen} />
-          <View style={styles.alertButtonText}>
-            <Text style={[styles.alertButtonTitle, { color: colors.text }]}>
-              {t.spotPrices.priceAlert}
-            </Text>
-            <Text style={[styles.alertButtonSubtitle, { color: colors.textSecondary }]}>
-              {t.spotPrices.setAlert}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color={colors.textSecondary} />
-        </TouchableOpacity>
+        {/* Data Source */}
+        <View style={[styles.sourceCard, { backgroundColor: colors.surface }]}>
+          <Ionicons name="information-circle-outline" size={20} color={colors.textMuted} />
+          <Text style={[styles.sourceText, { color: colors.textMuted }]}>
+            Data: OTE-CR (Operátor trhu s elektřinou)
+          </Text>
+        </View>
 
         {/* Last Updated */}
         <Text style={[styles.lastUpdated, { color: colors.textMuted }]}>
@@ -322,6 +367,15 @@ const styles = StyleSheet.create({
     padding: Layout.spacing.md,
     paddingBottom: 100,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: Layout.spacing.md,
+  },
+  loadingText: {
+    fontSize: Layout.fontSize.md,
+  },
   header: {
     marginBottom: Layout.spacing.lg,
   },
@@ -332,6 +386,18 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: Layout.fontSize.md,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    marginBottom: Layout.spacing.md,
+    gap: Layout.spacing.sm,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: Layout.fontSize.sm,
   },
   rangeSelector: {
     flexDirection: 'row',
@@ -368,9 +434,33 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.md,
     alignItems: 'center',
   },
+  currentPriceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Layout.spacing.sm,
+    marginBottom: Layout.spacing.xs,
+  },
   currentPriceLabel: {
     fontSize: Layout.fontSize.sm,
-    marginBottom: Layout.spacing.xs,
+  },
+  liveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Layout.borderRadius.full,
+    gap: 4,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: Colors.brand.accentGreen,
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: Colors.brand.accentGreen,
   },
   currentPriceRow: {
     flexDirection: 'row',
@@ -383,6 +473,10 @@ const styles = StyleSheet.create({
   currentPriceUnit: {
     fontSize: Layout.fontSize.lg,
     marginLeft: Layout.spacing.sm,
+  },
+  currentSlot: {
+    fontSize: Layout.fontSize.xs,
+    marginTop: Layout.spacing.xs,
   },
   chartContainer: {
     padding: Layout.spacing.md,
@@ -439,22 +533,15 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.lg,
     fontWeight: '600',
   },
-  alertButton: {
+  sourceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Layout.spacing.lg,
-    borderRadius: Layout.borderRadius.xl,
+    padding: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
     marginBottom: Layout.spacing.md,
-    gap: Layout.spacing.md,
+    gap: Layout.spacing.sm,
   },
-  alertButtonText: {
-    flex: 1,
-  },
-  alertButtonTitle: {
-    fontSize: Layout.fontSize.md,
-    fontWeight: '600',
-  },
-  alertButtonSubtitle: {
+  sourceText: {
     fontSize: Layout.fontSize.sm,
   },
   lastUpdated: {
