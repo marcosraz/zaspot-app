@@ -1,15 +1,24 @@
 /**
  * Root Layout - App entry point
- * Sets up providers and navigation
+ * Sets up providers, navigation, and animated splash screen
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { LanguageProvider } from '../context/LanguageContext';
+import { FavoritesProvider } from '../context/FavoritesContext';
+import { VehicleProvider } from '../context/VehicleContext';
+import { NotificationsProvider } from '../context/NotificationsContext';
+import AnimatedSplash from '../components/AnimatedSplash';
+
+// Keep the native splash screen visible while we load resources
+SplashScreen.preventAutoHideAsync();
 
 function RootLayoutNav() {
   const { isDark, colors } = useTheme();
@@ -37,13 +46,65 @@ function RootLayoutNav() {
   );
 }
 
+function AppContent() {
+  const [showSplash, setShowSplash] = useState(true);
+  const [appIsReady, setAppIsReady] = useState(false);
+
+  useEffect(() => {
+    async function prepare() {
+      try {
+        // Pre-load any data or resources here
+        // For now, just a small delay to show splash
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+      }
+    }
+
+    prepare();
+  }, []);
+
+  const onLayoutRootView = useCallback(async () => {
+    if (appIsReady) {
+      // Hide the native splash screen
+      await SplashScreen.hideAsync();
+    }
+  }, [appIsReady]);
+
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+  };
+
+  if (!appIsReady) {
+    return null;
+  }
+
+  return (
+    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+      {showSplash ? (
+        <AnimatedSplash onAnimationComplete={handleSplashComplete} />
+      ) : (
+        <RootLayoutNav />
+      )}
+    </View>
+  );
+}
+
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <RootLayoutNav />
+            <FavoritesProvider>
+              <VehicleProvider>
+                <NotificationsProvider>
+                  <AppContent />
+                </NotificationsProvider>
+              </VehicleProvider>
+            </FavoritesProvider>
           </LanguageProvider>
         </ThemeProvider>
       </SafeAreaProvider>

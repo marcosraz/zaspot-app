@@ -17,18 +17,23 @@ import {
   Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useFavorites } from '../../context/FavoritesContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { supabase, ChargingStation, fetchNearbyStations } from '../../lib/supabase';
+import { fetchStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
+import FavoriteButton from '../../components/FavoriteButton';
+import CustomMarker from '../../components/CustomMarker';
 
 export default function MapScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { isFavorite } = useFavorites();
   const mapRef = useRef<MapView>(null);
 
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
@@ -37,10 +42,13 @@ export default function MapScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stations, setStations] = useState<ChargingStation[]>([]);
+  const [isOffline, setIsOffline] = useState(false);
+  const [cacheInfo, setCacheInfo] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     dcOnly: false,
     acOnly: false,
     availableOnly: false,
+    favoritesOnly: false,
     minPower: 0,
   });
 
@@ -60,13 +68,15 @@ export default function MapScreen() {
   const loadStations = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('charging_stations')
-        .select('*')
-        .limit(500);
+      const { stations: data, isFromCache, cacheAge } = await fetchStationsWithCache();
+      setStations(data);
+      setIsOffline(isFromCache);
 
-      if (error) throw error;
-      setStations(data || []);
+      if (isFromCache && cacheAge) {
+        setCacheInfo(`Offline • Cache: ${formatCacheAge(cacheAge)}`);
+      } else {
+        setCacheInfo(null);
+      }
     } catch (error) {
       console.error('Error loading stations:', error);
     } finally {
@@ -92,6 +102,7 @@ export default function MapScreen() {
     if (filters.dcOnly && station.type !== 'DC') return false;
     if (filters.acOnly && station.type !== 'AC') return false;
     if (filters.availableOnly && !station.available) return false;
+    if (filters.favoritesOnly && !isFavorite(station.id)) return false;
     if (station.power_kw < filters.minPower) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -123,16 +134,24 @@ export default function MapScreen() {
     if (url) Linking.openURL(url);
   };
 
-  // Dark mode map style
+  // Dark mode map style - lighter version that works better
   const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#1a3646' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#304a7d' }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#255763' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0e1626' }] },
-    { featureType: 'poi', elementType: 'geometry', stylers: [{ color: '#283d6a' }] },
+    { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
+    { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
+    { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
+    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
+    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
+    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
+    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
+    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
+    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
+    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
     { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
+    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
+    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
+    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
   ];
 
   return (
@@ -141,11 +160,9 @@ export default function MapScreen() {
       <MapView
         ref={mapRef}
         style={styles.map}
-        provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
         initialRegion={region}
         showsUserLocation
         showsMyLocationButton={false}
-        customMapStyle={isDark ? darkMapStyle : undefined}
         mapPadding={{ top: 100, right: 0, bottom: 250, left: 0 }}
       >
         {filteredStations.map(station => (
@@ -156,14 +173,13 @@ export default function MapScreen() {
               longitude: Number(station.longitude),
             }}
             onPress={() => setSelectedStation(station)}
+            tracksViewChanges={false}
           >
-            <View style={[styles.marker, { backgroundColor: getMarkerColor(station) }]}>
-              <Ionicons
-                name={station.type === 'DC' ? 'flash' : 'battery-charging'}
-                size={14}
-                color="#FFFFFF"
-              />
-            </View>
+            <CustomMarker
+              station={station}
+              isSelected={selectedStation?.id === station.id}
+              isFavorite={isFavorite(station.id)}
+            />
           </Marker>
         ))}
       </MapView>
@@ -211,6 +227,14 @@ export default function MapScreen() {
         </Text>
       </View>
 
+      {/* Offline Indicator */}
+      {isOffline && cacheInfo && (
+        <View style={[styles.offlineBadge, { backgroundColor: '#F59E0B' }]}>
+          <Ionicons name="cloud-offline" size={14} color="#FFFFFF" />
+          <Text style={styles.offlineText}>{cacheInfo}</Text>
+        </View>
+      )}
+
       {/* Location Button */}
       <TouchableOpacity
         style={[styles.locationButton, { backgroundColor: colors.surface }]}
@@ -238,6 +262,7 @@ export default function MapScreen() {
                   {selectedStation.city && `, ${selectedStation.city}`}
                 </Text>
               </View>
+              <FavoriteButton stationId={selectedStation.id} size={26} style={{ marginRight: 8 }} />
               <TouchableOpacity
                 style={[styles.closeBtn, { backgroundColor: colors.surfaceSecondary }]}
                 onPress={() => setSelectedStation(null)}
@@ -357,6 +382,22 @@ export default function MapScreen() {
             </View>
 
             <ScrollView style={styles.filterContent}>
+              {/* Favorites Only */}
+              <TouchableOpacity
+                style={styles.filterOption}
+                onPress={() => setFilters({ ...filters, favoritesOnly: !filters.favoritesOnly })}
+              >
+                <View style={styles.filterOptionLeft}>
+                  <Ionicons name="heart" size={22} color="#EF4444" />
+                  <Text style={[styles.filterLabel, { color: colors.text }]}>Pouze oblíbené</Text>
+                </View>
+                <Ionicons
+                  name={filters.favoritesOnly ? 'checkbox' : 'square-outline'}
+                  size={24}
+                  color={filters.favoritesOnly ? Colors.brand.accentGreen : colors.textSecondary}
+                />
+              </TouchableOpacity>
+
               {/* Available Only */}
               <TouchableOpacity
                 style={styles.filterOption}
@@ -525,6 +566,27 @@ const styles = StyleSheet.create({
   },
   countText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  offlineBadge: {
+    position: 'absolute',
+    top: 155,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  offlineText: {
+    color: '#FFFFFF',
+    fontSize: 11,
     fontWeight: '600',
   },
   locationButton: {

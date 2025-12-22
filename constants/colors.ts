@@ -9,6 +9,7 @@ export const Colors = {
     accentGreen: '#16A34A',
     accentGreenLight: '#22C55E',
     accentGreenDark: '#15803D',
+    darkBg: '#1A1A1A',
   },
 
   // Light theme

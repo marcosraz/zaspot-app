@@ -16,6 +16,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useVehicle, POPULAR_VEHICLES, VehicleProfile } from '../../context/VehicleContext';
+import { useNotifications } from '../../context/NotificationsContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import Constants from 'expo-constants';
@@ -60,8 +62,35 @@ function MenuItem({ icon, label, value, onPress, showArrow = true, rightElement,
 export default function ProfileScreen() {
   const { colors, isDark, toggleTheme, setTheme } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLanguage();
+  const { settings, setSelectedVehicle } = useVehicle();
+  const {
+    settings: notificationSettings,
+    hasPermission,
+    requestPermission,
+    togglePriceAlert,
+    updatePriceAlert,
+    sendTestNotification,
+  } = useNotifications();
 
   const [showLanguageSelector, setShowLanguageSelector] = React.useState(false);
+  const [showVehicleSelector, setShowVehicleSelector] = React.useState(false);
+  const [showPriceAlertEditor, setShowPriceAlertEditor] = React.useState(false);
+
+  const getCurrentVehicleName = () => {
+    if (settings.selectedVehicle) {
+      return `${settings.selectedVehicle.manufacturer} ${settings.selectedVehicle.name}`;
+    }
+    return 'Vybrat vozidlo';
+  };
+
+  // Group vehicles by manufacturer
+  const vehiclesByManufacturer = POPULAR_VEHICLES.reduce((acc, vehicle) => {
+    if (!acc[vehicle.manufacturer]) {
+      acc[vehicle.manufacturer] = [];
+    }
+    acc[vehicle.manufacturer].push(vehicle);
+    return acc;
+  }, {} as Record<string, VehicleProfile[]>);
 
   const getCurrentLanguageName = () => {
     return availableLanguages.find(l => l.code === language)?.nativeName || 'Čeština';
@@ -156,8 +185,168 @@ export default function ProfileScreen() {
             <MenuItem
               icon="notifications"
               label={t.profile.notifications}
+              value={hasPermission ? 'Zapnuto' : 'Vypnuto'}
+              onPress={async () => {
+                if (!hasPermission) {
+                  await requestPermission();
+                }
+                setShowPriceAlertEditor(!showPriceAlertEditor);
+              }}
               iconColor="#F59E0B"
             />
+
+            {showPriceAlertEditor && (
+              <View style={[styles.priceAlertEditor, { backgroundColor: colors.surfaceSecondary }]}>
+                {/* Permission Status */}
+                {!hasPermission && (
+                  <TouchableOpacity
+                    style={[styles.enableNotificationsBtn, { backgroundColor: Colors.brand.accentGreen }]}
+                    onPress={requestPermission}
+                  >
+                    <Ionicons name="notifications" size={20} color="#FFFFFF" />
+                    <Text style={styles.enableNotificationsBtnText}>Povolit notifikace</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Price Alerts */}
+                {notificationSettings.priceAlerts.map((alert) => (
+                  <View key={alert.id} style={styles.priceAlertItem}>
+                    <View style={styles.priceAlertInfo}>
+                      <Text style={[styles.priceAlertLabel, { color: colors.text }]}>
+                        {alert.notifyBelow ? 'Upozornit pod' : 'Upozornit nad'}
+                      </Text>
+                      <View style={styles.priceAlertValue}>
+                        <TouchableOpacity
+                          onPress={() => updatePriceAlert(alert.id, {
+                            thresholdKwh: Math.max(0.5, alert.thresholdKwh - 0.5)
+                          })}
+                          style={[styles.priceAdjustBtn, { backgroundColor: colors.border }]}
+                        >
+                          <Ionicons name="remove" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                        <Text style={[styles.priceAlertAmount, { color: Colors.brand.accentGreen }]}>
+                          {alert.thresholdKwh.toFixed(1)} Kč/kWh
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => updatePriceAlert(alert.id, {
+                            thresholdKwh: Math.min(10, alert.thresholdKwh + 0.5)
+                          })}
+                          style={[styles.priceAdjustBtn, { backgroundColor: colors.border }]}
+                        >
+                          <Ionicons name="add" size={18} color={colors.text} />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <Switch
+                      value={alert.enabled}
+                      onValueChange={() => togglePriceAlert(alert.id)}
+                      trackColor={{ false: '#D1D5DB', true: Colors.brand.accentGreen + '50' }}
+                      thumbColor={alert.enabled ? Colors.brand.accentGreen : '#FFFFFF'}
+                    />
+                  </View>
+                ))}
+
+                {/* Test Notification Button */}
+                {hasPermission && (
+                  <TouchableOpacity
+                    style={[styles.testNotificationBtn, { borderColor: colors.border }]}
+                    onPress={sendTestNotification}
+                  >
+                    <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
+                    <Text style={[styles.testNotificationText, { color: colors.textSecondary }]}>
+                      Odeslat testovací notifikaci
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Vehicle Section */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+            ELEKTROMOBIL
+          </Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+            <MenuItem
+              icon="car-sport"
+              label="Moje vozidlo"
+              value={getCurrentVehicleName()}
+              onPress={() => setShowVehicleSelector(!showVehicleSelector)}
+              iconColor="#3B82F6"
+            />
+
+            {showVehicleSelector && (
+              <View style={[styles.vehicleSelector, { backgroundColor: colors.surfaceSecondary }]}>
+                <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled>
+                  {Object.entries(vehiclesByManufacturer).map(([manufacturer, vehicles]) => (
+                    <View key={manufacturer}>
+                      <Text style={[styles.manufacturerHeader, { color: colors.textSecondary }]}>
+                        {manufacturer}
+                      </Text>
+                      {vehicles.map((vehicle) => (
+                        <TouchableOpacity
+                          key={vehicle.id}
+                          style={[
+                            styles.vehicleOption,
+                            settings.selectedVehicle?.id === vehicle.id && styles.vehicleOptionActive,
+                          ]}
+                          onPress={() => {
+                            setSelectedVehicle(vehicle);
+                            setShowVehicleSelector(false);
+                          }}
+                        >
+                          <View style={styles.vehicleInfo}>
+                            <Text style={[
+                              styles.vehicleName,
+                              { color: settings.selectedVehicle?.id === vehicle.id ? Colors.brand.accentGreen : colors.text }
+                            ]}>
+                              {vehicle.name}
+                            </Text>
+                            <Text style={[styles.vehicleSpecs, { color: colors.textMuted }]}>
+                              {vehicle.batteryCapacityKwh} kWh • {vehicle.rangeKm} km • {vehicle.maxChargingPowerKw} kW
+                            </Text>
+                          </View>
+                          {settings.selectedVehicle?.id === vehicle.id && (
+                            <Ionicons name="checkmark" size={20} color={Colors.brand.accentGreen} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {settings.selectedVehicle && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View style={styles.vehicleStats}>
+                  <View style={styles.vehicleStat}>
+                    <Ionicons name="battery-full" size={20} color={Colors.brand.accentGreen} />
+                    <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
+                      {settings.selectedVehicle.batteryCapacityKwh} kWh
+                    </Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Baterie</Text>
+                  </View>
+                  <View style={styles.vehicleStat}>
+                    <Ionicons name="speedometer" size={20} color="#3B82F6" />
+                    <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
+                      {settings.selectedVehicle.rangeKm} km
+                    </Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Dojezd</Text>
+                  </View>
+                  <View style={styles.vehicleStat}>
+                    <Ionicons name="flash" size={20} color="#F59E0B" />
+                    <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
+                      {settings.selectedVehicle.maxChargingPowerKw} kW
+                    </Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Max nabíjení</Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -326,6 +515,121 @@ const styles = StyleSheet.create({
   },
   languageText: {
     fontSize: Layout.fontSize.md,
+  },
+  vehicleSelector: {
+    marginHorizontal: Layout.spacing.md,
+    marginBottom: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    overflow: 'hidden',
+  },
+  manufacturerHeader: {
+    fontSize: Layout.fontSize.xs,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: Layout.spacing.md,
+    paddingTop: Layout.spacing.md,
+    paddingBottom: Layout.spacing.xs,
+  },
+  vehicleOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: Layout.spacing.md,
+  },
+  vehicleOptionActive: {
+    backgroundColor: Colors.brand.accentGreen + '10',
+  },
+  vehicleInfo: {
+    flex: 1,
+  },
+  vehicleName: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '500',
+  },
+  vehicleSpecs: {
+    fontSize: Layout.fontSize.xs,
+    marginTop: 2,
+  },
+  vehicleStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: Layout.spacing.md,
+  },
+  vehicleStat: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  vehicleStatValue: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
+  },
+  vehicleStatLabel: {
+    fontSize: Layout.fontSize.xs,
+  },
+  priceAlertEditor: {
+    marginHorizontal: Layout.spacing.md,
+    marginBottom: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    padding: Layout.spacing.md,
+  },
+  enableNotificationsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    gap: Layout.spacing.sm,
+    marginBottom: Layout.spacing.md,
+  },
+  enableNotificationsBtnText: {
+    color: '#FFFFFF',
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
+  },
+  priceAlertItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Layout.spacing.sm,
+  },
+  priceAlertInfo: {
+    flex: 1,
+  },
+  priceAlertLabel: {
+    fontSize: Layout.fontSize.sm,
+    marginBottom: 4,
+  },
+  priceAlertValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Layout.spacing.sm,
+  },
+  priceAdjustBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  priceAlertAmount: {
+    fontSize: Layout.fontSize.lg,
+    fontWeight: '600',
+    minWidth: 100,
+    textAlign: 'center',
+  },
+  testNotificationBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    borderWidth: 1,
+    gap: Layout.spacing.sm,
+    marginTop: Layout.spacing.md,
+  },
+  testNotificationText: {
+    fontSize: Layout.fontSize.sm,
   },
   appInfo: {
     alignItems: 'center',

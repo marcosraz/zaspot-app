@@ -100,3 +100,22 @@ export async function fetchStation(id: string): Promise<ChargingStation | null> 
 
   return data;
 }
+
+// Fetch multiple stations by IDs (for favorites)
+export async function fetchStationsByIds(ids: string[]): Promise<ChargingStation[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('charging_stations')
+    .select('*')
+    .in('id', ids);
+
+  if (error) {
+    console.error('Error fetching stations by IDs:', error);
+    return [];
+  }
+
+  // Maintain the order of the input IDs
+  const stationMap = new Map(data?.map(s => [s.id, s]) || []);
+  return ids.map(id => stationMap.get(id)).filter((s): s is ChargingStation => s !== undefined);
+}

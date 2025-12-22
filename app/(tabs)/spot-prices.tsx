@@ -48,7 +48,7 @@ export default function SpotPricesScreen() {
     setError(null);
     try {
       // Load today's data
-      const today = await fetchSpotPrices(new Date(), 'PT60M');
+      const today = await fetchSpotPrices();
       if (today) {
         setDailyData(today);
       }
