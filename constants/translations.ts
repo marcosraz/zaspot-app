@@ -52,6 +52,11 @@ export interface Translations {
     navigate: string;
     reserve: string;
     distance: string;
+    favoritesOnly: string;
+    freeParking: string;
+    connectorType: string;
+    resetFilters: string;
+    allTypes: string;
   };
 
   // Spot prices screen
@@ -208,6 +213,11 @@ export const translations: Record<Language, Translations> = {
       navigate: 'Navigovat',
       reserve: 'Rezervovat',
       distance: 'Vzdálenost',
+      favoritesOnly: 'Pouze oblíbené',
+      freeParking: 'Parkování zdarma',
+      connectorType: 'Typ konektoru',
+      resetFilters: 'Resetovat filtry',
+      allTypes: 'Vše',
     },
     spotPrices: {
       title: 'Spotové ceny elektřiny',
@@ -351,6 +361,11 @@ export const translations: Record<Language, Translations> = {
       navigate: 'Navigate',
       reserve: 'Reserve',
       distance: 'Distance',
+      favoritesOnly: 'Favorites only',
+      freeParking: 'Free parking',
+      connectorType: 'Connector type',
+      resetFilters: 'Reset filters',
+      allTypes: 'All',
     },
     spotPrices: {
       title: 'Electricity Spot Prices',
@@ -494,6 +509,11 @@ export const translations: Record<Language, Translations> = {
       navigate: 'Navigieren',
       reserve: 'Reservieren',
       distance: 'Entfernung',
+      favoritesOnly: 'Nur Favoriten',
+      freeParking: 'Kostenloses Parken',
+      connectorType: 'Anschlusstyp',
+      resetFilters: 'Filter zurücksetzen',
+      allTypes: 'Alle',
     },
     spotPrices: {
       title: 'Stromspotpreise',
@@ -637,6 +657,11 @@ export const translations: Record<Language, Translations> = {
       navigate: 'Nawiguj',
       reserve: 'Zarezerwuj',
       distance: 'Odległość',
+      favoritesOnly: 'Tylko ulubione',
+      freeParking: 'Darmowy parking',
+      connectorType: 'Typ złącza',
+      resetFilters: 'Resetuj filtry',
+      allTypes: 'Wszystko',
     },
     spotPrices: {
       title: 'Ceny spot energii',

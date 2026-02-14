@@ -1,5 +1,5 @@
 /**
- * Map Screen - Charging stations map with real Supabase data
+ * Map Screen - Charging stations map with clustering
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -14,27 +14,29 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, Region } from 'react-native-maps';
+import ClusteredMapView from 'react-native-map-clustering';
+import { Marker, Region } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
-import { supabase, ChargingStation, fetchNearbyStations } from '../../lib/supabase';
+import { ChargingStation } from '../../lib/stations';
 import { fetchStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
 import FavoriteButton from '../../components/FavoriteButton';
 import CustomMarker from '../../components/CustomMarker';
+import ClusterMarker from '../../components/ClusterMarker';
 
 export default function MapScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { isFavorite } = useFavorites();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
 
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +51,8 @@ export default function MapScreen() {
     acOnly: false,
     availableOnly: false,
     favoritesOnly: false,
+    freeParking: false,
+    connectorType: null as string | null,
     minPower: 0,
   });
 
@@ -98,11 +102,34 @@ export default function MapScreen() {
     return station.type === 'DC' ? '#3B82F6' : Colors.marker.available;
   };
 
+  const hasActiveFilters = filters.dcOnly || filters.acOnly || filters.availableOnly
+    || filters.favoritesOnly || filters.freeParking || filters.connectorType !== null
+    || filters.minPower > 0;
+
+  const resetFilters = () => setFilters({
+    dcOnly: false,
+    acOnly: false,
+    availableOnly: false,
+    favoritesOnly: false,
+    freeParking: false,
+    connectorType: null,
+    minPower: 0,
+  });
+
+  // Collect all unique connector types from stations for the filter UI
+  const availableConnectorTypes = React.useMemo(() => {
+    const types = new Set<string>();
+    stations.forEach(s => s.connector_types?.forEach(c => types.add(c)));
+    return Array.from(types).sort();
+  }, [stations]);
+
   const filteredStations = stations.filter(station => {
     if (filters.dcOnly && station.type !== 'DC') return false;
     if (filters.acOnly && station.type !== 'AC') return false;
     if (filters.availableOnly && !station.available) return false;
     if (filters.favoritesOnly && !isFavorite(station.id)) return false;
+    if (filters.freeParking && station.parking_fee !== false) return false;
+    if (filters.connectorType && !station.connector_types?.includes(filters.connectorType)) return false;
     if (station.power_kw < filters.minPower) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -156,14 +183,41 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Map */}
-      <MapView
+      {/* Map with clustering */}
+      <ClusteredMapView
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
         showsUserLocation
         showsMyLocationButton={false}
         mapPadding={{ top: 100, right: 0, bottom: 250, left: 0 }}
+        customMapStyle={isDark ? darkMapStyle : undefined}
+        clusterColor={Colors.brand.accentGreen}
+        clusterTextColor="#FFFFFF"
+        clusterFontFamily="System"
+        radius={60}
+        minZoom={1}
+        maxZoom={16}
+        extent={512}
+        animationEnabled={false}
+        renderCluster={(cluster) => {
+          const { id, geometry, onPress, properties } = cluster;
+          const count = properties.point_count;
+          return (
+            <Marker
+              key={`cluster-${id}`}
+              coordinate={{
+                latitude: geometry.coordinates[1],
+                longitude: geometry.coordinates[0],
+              }}
+              onPress={onPress}
+              tracksViewChanges={false}
+            >
+              <ClusterMarker count={count} />
+            </Marker>
+          );
+        }}
+        onRegionChangeComplete={(newRegion: Region) => setRegion(newRegion)}
       >
         {filteredStations.map(station => (
           <Marker
@@ -182,7 +236,7 @@ export default function MapScreen() {
             />
           </Marker>
         ))}
-      </MapView>
+      </ClusteredMapView>
 
       {/* Loading Indicator */}
       {loading && (
@@ -215,7 +269,8 @@ export default function MapScreen() {
           style={[styles.filterButton, { backgroundColor: colors.surface }]}
           onPress={() => setShowFilters(true)}
         >
-          <Ionicons name="options" size={22} color={colors.text} />
+          <Ionicons name="options" size={22} color={hasActiveFilters ? Colors.brand.accentGreen : colors.text} />
+          {hasActiveFilters && <View style={styles.filterActiveDot} />}
         </TouchableOpacity>
       </SafeAreaView>
 
@@ -357,9 +412,15 @@ export default function MapScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionBtnPrimary}>
-              <Ionicons name="calendar" size={20} color="#FFFFFF" />
-              <Text style={styles.actionBtnPrimaryText}>{t.map.reserve}</Text>
+            <TouchableOpacity
+              style={styles.actionBtnPrimary}
+              onPress={() => {
+                setSelectedStation(null);
+                router.push(`/station/${selectedStation.id}`);
+              }}
+            >
+              <Ionicons name="flash" size={20} color="#FFFFFF" />
+              <Text style={styles.actionBtnPrimaryText}>{t.map.stationDetails}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -389,7 +450,7 @@ export default function MapScreen() {
               >
                 <View style={styles.filterOptionLeft}>
                   <Ionicons name="heart" size={22} color="#EF4444" />
-                  <Text style={[styles.filterLabel, { color: colors.text }]}>Pouze oblíbené</Text>
+                  <Text style={[styles.filterLabel, { color: colors.text }]}>{t.map.favoritesOnly}</Text>
                 </View>
                 <Ionicons
                   name={filters.favoritesOnly ? 'checkbox' : 'square-outline'}
@@ -446,6 +507,72 @@ export default function MapScreen() {
                 />
               </TouchableOpacity>
 
+              {/* Free Parking */}
+              <TouchableOpacity
+                style={styles.filterOption}
+                onPress={() => setFilters({ ...filters, freeParking: !filters.freeParking })}
+              >
+                <View style={styles.filterOptionLeft}>
+                  <Ionicons name="car" size={22} color="#8B5CF6" />
+                  <Text style={[styles.filterLabel, { color: colors.text }]}>{t.map.freeParking}</Text>
+                </View>
+                <Ionicons
+                  name={filters.freeParking ? 'checkbox' : 'square-outline'}
+                  size={24}
+                  color={filters.freeParking ? Colors.brand.accentGreen : colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Connector Type */}
+              {availableConnectorTypes.length > 0 && (
+                <View style={styles.filterSection}>
+                  <Text style={[styles.filterSectionTitle, { color: colors.text }]}>
+                    {t.map.connectorType}
+                  </Text>
+                  <View style={styles.connectorButtons}>
+                    <TouchableOpacity
+                      style={[
+                        styles.connectorButton,
+                        { borderColor: colors.border },
+                        filters.connectorType === null && {
+                          backgroundColor: Colors.brand.accentGreen,
+                          borderColor: Colors.brand.accentGreen
+                        }
+                      ]}
+                      onPress={() => setFilters({ ...filters, connectorType: null })}
+                    >
+                      <Text style={[
+                        styles.connectorButtonText,
+                        { color: filters.connectorType === null ? '#FFFFFF' : colors.text }
+                      ]}>
+                        {t.map.allTypes}
+                      </Text>
+                    </TouchableOpacity>
+                    {availableConnectorTypes.map(type => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[
+                          styles.connectorButton,
+                          { borderColor: colors.border },
+                          filters.connectorType === type && {
+                            backgroundColor: Colors.brand.accentGreen,
+                            borderColor: Colors.brand.accentGreen
+                          }
+                        ]}
+                        onPress={() => setFilters({ ...filters, connectorType: type })}
+                      >
+                        <Text style={[
+                          styles.connectorButtonText,
+                          { color: filters.connectorType === type ? '#FFFFFF' : colors.text }
+                        ]}>
+                          {type}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {/* Min Power */}
               <View style={styles.filterSection}>
                 <Text style={[styles.filterSectionTitle, { color: colors.text }]}>
@@ -469,13 +596,23 @@ export default function MapScreen() {
                         styles.powerButtonText,
                         { color: filters.minPower === power ? '#FFFFFF' : colors.text }
                       ]}>
-                        {power === 0 ? 'Alle' : `${power}+`}
+                        {power === 0 ? t.map.allTypes : `${power}+`}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
             </ScrollView>
+
+            {hasActiveFilters && (
+              <TouchableOpacity
+                style={styles.resetButton}
+                onPress={resetFilters}
+              >
+                <Ionicons name="refresh" size={18} color="#EF4444" />
+                <Text style={styles.resetButtonText}>{t.map.resetFilters}</Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.applyButton}
@@ -830,6 +967,50 @@ const styles = StyleSheet.create({
   powerButtonText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  connectorButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  connectorButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+  },
+  connectorButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  filterActiveDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.brand.accentGreen,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    gap: 8,
+  },
+  resetButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#EF4444',
   },
   applyButton: {
     margin: 20,
