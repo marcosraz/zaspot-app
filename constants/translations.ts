@@ -81,6 +81,10 @@ export interface Translations {
     rising: string;
     falling: string;
     stable: string;
+    hourlyPrices: string;
+    chargeNow: string;
+    waitForBetter: string;
+    savingPotential: string;
   };
 
   // Route planner
@@ -240,6 +244,10 @@ export const translations: Record<Language, Translations> = {
       rising: 'Stoupá',
       falling: 'Klesá',
       stable: 'Stabilní',
+      hourlyPrices: 'Hodinové ceny',
+      chargeNow: 'Nabíjejte nyní!',
+      waitForBetter: 'Počkejte na lepší cenu',
+      savingPotential: 'Potenciál úspory',
     },
     route: {
       title: 'Plánovat cestu',
@@ -388,6 +396,10 @@ export const translations: Record<Language, Translations> = {
       rising: 'Rising',
       falling: 'Falling',
       stable: 'Stable',
+      hourlyPrices: 'Hourly prices',
+      chargeNow: 'Charge now!',
+      waitForBetter: 'Wait for a better price',
+      savingPotential: 'Saving potential',
     },
     route: {
       title: 'Plan Route',
@@ -536,6 +548,10 @@ export const translations: Record<Language, Translations> = {
       rising: 'Steigend',
       falling: 'Fallend',
       stable: 'Stabil',
+      hourlyPrices: 'Stündliche Preise',
+      chargeNow: 'Jetzt laden!',
+      waitForBetter: 'Auf besseren Preis warten',
+      savingPotential: 'Sparpotenzial',
     },
     route: {
       title: 'Route planen',
@@ -684,6 +700,10 @@ export const translations: Record<Language, Translations> = {
       rising: 'Rośnie',
       falling: 'Spada',
       stable: 'Stabilny',
+      hourlyPrices: 'Ceny godzinowe',
+      chargeNow: 'Ładuj teraz!',
+      waitForBetter: 'Poczekaj na lepszą cenę',
+      savingPotential: 'Potencjał oszczędności',
     },
     route: {
       title: 'Zaplanuj trasę',

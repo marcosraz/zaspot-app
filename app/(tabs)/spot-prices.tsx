@@ -20,6 +20,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useNotifications } from '../../context/NotificationsContext';
 import {
   fetchSpotPrices,
   fetchSpotPricesRange,
@@ -33,6 +34,7 @@ type TimeRange = 'today' | 'week' | 'month';
 export default function SpotPricesScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { checkPriceAndNotify } = useNotifications();
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -51,6 +53,13 @@ export default function SpotPricesScreen() {
       const today = await fetchSpotPrices();
       if (today) {
         setDailyData(today);
+
+        // Check if current price triggers any notification alerts
+        const currentHour = Math.floor(getCurrentSlot() / 4);
+        const currentPrice = today.prices[currentHour]?.priceKwh;
+        if (currentPrice) {
+          checkPriceAndNotify(currentPrice);
+        }
       }
 
       // Load weekly data
@@ -132,7 +141,7 @@ export default function SpotPricesScreen() {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.brand.accentGreen} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Načítám ceny z OTE...
+            {t.common.loading}
           </Text>
         </View>
       </SafeAreaView>
@@ -287,6 +296,53 @@ export default function SpotPricesScreen() {
           </View>
         )}
 
+        {/* Hourly Prices List */}
+        {timeRange === 'today' && dailyData && (
+          <View style={[styles.hourlyContainer, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.hourlySectionTitle, { color: colors.text }]}>
+              {t.spotPrices.hourlyPrices}
+            </Text>
+            {dailyData.prices.filter(p => p.price > 0).map((p, idx) => {
+              const currentHour = new Date().getHours();
+              const isCurrent = p.slot === currentHour;
+              const barWidth = dailyData.stats.highest > 0
+                ? Math.max(8, (p.priceKwh / dailyData.stats.highest) * 100)
+                : 0;
+              const barColor = getPriceColor(p.priceKwh);
+              return (
+                <View
+                  key={idx}
+                  style={[
+                    styles.hourlyRow,
+                    isCurrent && { backgroundColor: isDark ? '#FFFFFF08' : '#F0FDF4' },
+                  ]}
+                >
+                  <View style={styles.hourlyTimeCol}>
+                    {isCurrent && <View style={[styles.currentDot, { backgroundColor: Colors.brand.accentGreen }]} />}
+                    <Text style={[
+                      styles.hourlyTime,
+                      { color: isCurrent ? Colors.brand.accentGreen : colors.textSecondary },
+                      isCurrent && { fontWeight: '700' },
+                    ]}>
+                      {p.time}
+                    </Text>
+                  </View>
+                  <View style={styles.hourlyBarCol}>
+                    <View style={[styles.hourlyBar, { width: `${barWidth}%`, backgroundColor: barColor }]} />
+                  </View>
+                  <Text style={[
+                    styles.hourlyPrice,
+                    { color: barColor },
+                    isCurrent && { fontWeight: '700' },
+                  ]}>
+                    {(unit === 'kwh' ? p.priceKwh : p.price).toFixed(2)}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
@@ -326,21 +382,41 @@ export default function SpotPricesScreen() {
           </View>
         </View>
 
-        {/* Best Time Card */}
-        <View style={[styles.bestTimeCard, { backgroundColor: isDark ? colors.surfaceSecondary : '#ECFDF5' }]}>
-          <View style={styles.bestTimeHeader}>
-            <Ionicons name="time" size={24} color={Colors.brand.accentGreen} />
-            <Text style={[styles.bestTimeTitle, { color: Colors.brand.accentGreen }]}>
-              {t.spotPrices.bestTime}
-            </Text>
-          </View>
-          <Text style={[styles.bestTimeValue, { color: colors.text }]}>
-            {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
-          </Text>
-          <Text style={[styles.bestTimePrice, { color: Colors.brand.accentGreen }]}>
-            {displayStats.lowest.toFixed(2)} {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
-          </Text>
-        </View>
+        {/* Recommendation Card */}
+        {(() => {
+          const currentIsLow = stats.current <= stats.average * 0.7;
+          const saving = stats.highest - stats.lowest;
+          const displaySaving = unit === 'kwh' ? saving : saving * 1000;
+          const recColor = currentIsLow ? Colors.brand.accentGreen : '#F59E0B';
+          const recBg = currentIsLow
+            ? (isDark ? '#16A34A15' : '#ECFDF5')
+            : (isDark ? '#F59E0B15' : '#FFFBEB');
+          return (
+            <View style={[styles.bestTimeCard, { backgroundColor: recBg }]}>
+              <View style={styles.bestTimeHeader}>
+                <Ionicons
+                  name={currentIsLow ? 'flash' : 'time'}
+                  size={24}
+                  color={recColor}
+                />
+                <Text style={[styles.bestTimeTitle, { color: recColor }]}>
+                  {currentIsLow ? t.spotPrices.chargeNow : t.spotPrices.waitForBetter}
+                </Text>
+              </View>
+              <Text style={[styles.bestTimeValue, { color: colors.text }]}>
+                {t.spotPrices.bestTime}: {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
+              </Text>
+              <Text style={[styles.bestTimePrice, { color: recColor }]}>
+                {displayStats.lowest.toFixed(2)} {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
+              </Text>
+              {saving > 0 && (
+                <Text style={[styles.savingText, { color: colors.textSecondary }]}>
+                  {t.spotPrices.savingPotential}: {displaySaving.toFixed(2)} {unit === 'mwh' ? 'CZK/MWh' : 'CZK/kWh'}
+                </Text>
+              )}
+            </View>
+          );
+        })()}
 
         {/* Data Source */}
         <View style={[styles.sourceCard, { backgroundColor: colors.surface }]}>
@@ -531,6 +607,61 @@ const styles = StyleSheet.create({
   },
   bestTimePrice: {
     fontSize: Layout.fontSize.lg,
+    fontWeight: '600',
+  },
+  savingText: {
+    fontSize: Layout.fontSize.sm,
+    marginTop: Layout.spacing.xs,
+  },
+  hourlyContainer: {
+    borderRadius: Layout.borderRadius.xl,
+    padding: Layout.spacing.md,
+    marginBottom: Layout.spacing.md,
+  },
+  hourlySectionTitle: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
+    marginBottom: Layout.spacing.sm,
+  },
+  hourlyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    borderRadius: Layout.borderRadius.sm,
+  },
+  hourlyTimeCol: {
+    width: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  currentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  hourlyTime: {
+    fontSize: Layout.fontSize.sm,
+    fontWeight: '500',
+  },
+  hourlyBarCol: {
+    flex: 1,
+    height: 16,
+    backgroundColor: 'transparent',
+    borderRadius: 4,
+    marginHorizontal: Layout.spacing.sm,
+    overflow: 'hidden',
+  },
+  hourlyBar: {
+    height: '100%',
+    borderRadius: 4,
+    opacity: 0.85,
+  },
+  hourlyPrice: {
+    width: 56,
+    textAlign: 'right',
+    fontSize: Layout.fontSize.sm,
     fontWeight: '600',
   },
   sourceCard: {
