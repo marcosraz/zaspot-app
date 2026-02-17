@@ -2,7 +2,7 @@
  * Home Screen - Dashboard with real-time spot prices and nearby stations
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,8 +23,10 @@ import { useNotifications } from '../../context/NotificationsContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchSpotPrices, getCurrentSlot, getPriceColor, DailyPrices } from '../../lib/spotPrices';
-import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../lib/supabase';
+import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../lib/stations';
+import { fetchEffectivePrices, EffectivePrices, formatPrice } from '../../lib/pricing';
 import FavoriteButton from '../../components/FavoriteButton';
+import ActiveChargingWidget from '../../components/ActiveChargingWidget';
 
 interface QuickAction {
   icon: keyof typeof Ionicons.glyphMap;
@@ -44,19 +46,24 @@ export default function HomeScreen() {
   const [priceData, setPriceData] = useState<DailyPrices | null>(null);
   const [nearbyStations, setNearbyStations] = useState<ChargingStation[]>([]);
   const [favoriteStations, setFavoriteStations] = useState<ChargingStation[]>([]);
+  const [effectivePrices, setEffectivePrices] = useState<EffectivePrices | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
 
   const quickActions: QuickAction[] = [
     { icon: 'map', label: t.home.findStation, route: '/map', color: Colors.brand.accentGreen },
     { icon: 'navigate', label: t.home.planRoute, route: '/route', color: '#3B82F6' },
     { icon: 'flash', label: t.home.spotPrices, route: '/spot-prices', color: '#F59E0B' },
-    { icon: 'calendar', label: t.home.myReservations, route: '/profile', color: '#8B5CF6' },
+    { icon: 'calendar', label: t.home.myReservations, route: '/reservations', color: '#8B5CF6' },
   ];
 
   const loadData = useCallback(async () => {
     try {
-      // Load spot prices
-      const prices = await fetchSpotPrices();
+      // Load spot prices and effective prices in parallel
+      const [prices, effective] = await Promise.all([
+        fetchSpotPrices(),
+        fetchEffectivePrices(),
+      ]);
+
       if (prices) {
         setPriceData(prices);
 
@@ -67,6 +74,7 @@ export default function HomeScreen() {
           checkPriceAndNotify(currentPrice);
         }
       }
+      if (effective) setEffectivePrices(effective);
 
       // Try to get location and nearby stations
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -104,16 +112,29 @@ export default function HomeScreen() {
     loadData();
   }, [loadData]);
 
+  // Auto-refresh prices every 60 seconds
+  const priceRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    priceRefreshRef.current = setInterval(async () => {
+      const ep = await fetchEffectivePrices();
+      if (ep) setEffectivePrices(ep);
+    }, 60 * 1000);
+    return () => {
+      if (priceRefreshRef.current) clearInterval(priceRefreshRef.current);
+    };
+  }, []);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
   };
 
-  // Calculate current price and trend
+  // Use effective spot price from current-spot-price API (updates every 15 min)
+  // Falls back to hourly OTE price if effective prices not available
   const currentSlot = getCurrentSlot();
   const currentHour = Math.floor(currentSlot / 4);
-  const currentPrice = priceData?.prices[currentHour]?.priceKwh || 0;
+  const currentPrice = effectivePrices?.spotPrice || priceData?.prices[currentHour]?.priceKwh || 0;
   const prevPrice = priceData?.prices[Math.max(0, currentHour - 1)]?.priceKwh || currentPrice;
   const trend = currentPrice < prevPrice ? 'falling' : currentPrice > prevPrice ? 'rising' : 'stable';
 
@@ -169,6 +190,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Active Charging Session */}
+        <ActiveChargingWidget />
+
         {/* Current Price Card */}
         <View style={[styles.priceCard, { backgroundColor: colors.surface }]}>
           <View style={styles.priceHeader}>
@@ -178,7 +202,9 @@ export default function HomeScreen() {
               </Text>
               <View style={[styles.liveBadge, { backgroundColor: Colors.brand.accentGreen + '20' }]}>
                 <View style={styles.liveDot} />
-                <Text style={styles.liveText}>LIVE</Text>
+                <Text style={styles.liveText}>
+                  {effectivePrices?.timeSlot || 'LIVE'}
+                </Text>
               </View>
             </View>
             <View style={styles.trendContainer}>
@@ -204,6 +230,26 @@ export default function HomeScreen() {
               {t.home.perKwh}
             </Text>
           </View>
+
+          {/* Effective DC/AC Prices */}
+          {effectivePrices && (
+            <View style={styles.effectivePriceRow}>
+              <View style={[styles.effectivePriceBox, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
+                <Text style={[styles.effectivePriceLabel, { color: colors.textSecondary }]}>AC</Text>
+                <Text style={[styles.effectivePriceValue, { color: Colors.brand.accentGreen }]}>
+                  {formatPrice(effectivePrices.acPrice)}
+                </Text>
+                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>CZK/kWh</Text>
+              </View>
+              <View style={[styles.effectivePriceBox, { backgroundColor: '#EF4444' + '12' }]}>
+                <Text style={[styles.effectivePriceLabel, { color: colors.textSecondary }]}>DC</Text>
+                <Text style={[styles.effectivePriceValue, { color: '#EF4444' }]}>
+                  {formatPrice(effectivePrices.dcPrice)}
+                </Text>
+                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>CZK/kWh</Text>
+              </View>
+            </View>
+          )}
 
           <View style={styles.priceStats}>
             <View style={styles.statItem}>
@@ -293,7 +339,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={station.id}
                   style={[styles.stationCard, { backgroundColor: colors.surface }]}
-                  onPress={() => router.push('/map')}
+                  onPress={() => router.push(`/station/${station.id}`)}
                 >
                   <View style={[
                     styles.stationTypeIcon,
@@ -347,7 +393,7 @@ export default function HomeScreen() {
               <TouchableOpacity
                 key={station.id}
                 style={[styles.stationCard, { backgroundColor: colors.surface }]}
-                onPress={() => router.push('/map')}
+                onPress={() => router.push(`/station/${station.id}`)}
               >
                 <View style={[
                   styles.stationTypeIcon,
@@ -515,6 +561,30 @@ const styles = StyleSheet.create({
   priceUnit: {
     fontSize: Layout.fontSize.lg,
     marginLeft: Layout.spacing.sm,
+  },
+  effectivePriceRow: {
+    flexDirection: 'row',
+    gap: Layout.spacing.sm,
+    marginBottom: Layout.spacing.lg,
+  },
+  effectivePriceBox: {
+    flex: 1,
+    borderRadius: Layout.borderRadius.lg,
+    padding: Layout.spacing.md,
+    alignItems: 'center',
+    gap: 2,
+  },
+  effectivePriceLabel: {
+    fontSize: Layout.fontSize.xs,
+    fontWeight: '700',
+  },
+  effectivePriceValue: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  effectivePriceUnit: {
+    fontSize: 10,
   },
   priceStats: {
     flexDirection: 'row',

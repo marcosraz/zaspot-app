@@ -5,7 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { ChargingStation, supabase } from './supabase';
+import { ChargingStation, fetchStations } from './stations';
 
 const CACHE_KEY = '@zaspot_stations_cache';
 const CACHE_TIMESTAMP_KEY = '@zaspot_stations_cache_timestamp';
@@ -106,15 +106,8 @@ export async function fetchStationsWithCache(): Promise<{
 
   if (online) {
     try {
-      // Fetch fresh data
-      const { data, error } = await supabase
-        .from('charging_stations')
-        .select('*')
-        .limit(1000);
-
-      if (error) throw error;
-
-      const stations = data || [];
+      // Fetch fresh data via REST API
+      const stations = await fetchStations();
 
       // Update cache
       await cacheStations(stations);

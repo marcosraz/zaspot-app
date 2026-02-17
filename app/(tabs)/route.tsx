@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useVehicle } from '../../context/VehicleContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -32,17 +33,25 @@ import {
 export default function RouteScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { settings, activeVehicle } = useVehicle();
 
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
   const [fromCoords, setFromCoords] = useState<RoutePoint | null>(null);
   const [toCoords, setToCoords] = useState<RoutePoint | null>(null);
-  const [batteryLevel, setBatteryLevel] = useState(80);
-  const [vehicleRange, setVehicleRange] = useState(400);
+  const [batteryLevel, setBatteryLevel] = useState(settings.currentBatteryPercent);
+  const [vehicleRange, setVehicleRange] = useState(activeVehicle?.rangeKm ?? 400);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Update values when active vehicle changes
+  useEffect(() => {
+    if (activeVehicle) {
+      setVehicleRange(activeVehicle.rangeKm);
+    }
+  }, [activeVehicle]);
 
   // Get current location
   const useCurrentLocation = async () => {
@@ -125,7 +134,9 @@ export default function RouteScreen() {
         to,
         batteryLevel,
         vehicleRange,
-        60 // Default battery capacity
+        activeVehicle?.batteryCapacityKwh ?? 60,
+        activeVehicle?.maxChargingPowerKw,
+        activeVehicle?.connectorType
       );
       setRouteResult(result);
     } catch (err) {
@@ -218,11 +229,32 @@ export default function RouteScreen() {
 
           {/* Vehicle Info */}
           <View style={[styles.vehicleInfo, { borderTopColor: colors.border }]}>
-            <View style={styles.vehicleRow}>
+            {/* Active Vehicle Banner */}
+            {activeVehicle ? (
+              <View style={[styles.activeVehicleBanner, { backgroundColor: Colors.brand.accentGreen + '15' }]}>
+                <Ionicons name="car-sport" size={20} color={Colors.brand.accentGreen} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.activeVehicleName, { color: colors.text }]}>
+                    {activeVehicle.manufacturer} {activeVehicle.name}
+                  </Text>
+                  <Text style={[styles.activeVehicleSpecs, { color: colors.textSecondary }]}>
+                    {activeVehicle.batteryCapacityKwh} kWh · {activeVehicle.maxChargingPowerKw} kW · {activeVehicle.connectorType}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <View style={[styles.noVehicleBanner, { backgroundColor: '#F59E0B' + '15' }]}>
+                <Ionicons name="information-circle" size={18} color="#F59E0B" />
+                <Text style={[styles.noVehicleText, { color: colors.textSecondary }]}>
+                  {t.route.noVehicleHint || 'Vyberte si vozidlo v profilu pro přesnější výpočet'}
+                </Text>
+              </View>
+            )}
+
+            <View style={[styles.vehicleRow, { marginTop: Layout.spacing.md }]}>
               <TouchableOpacity
                 style={styles.vehicleItem}
                 onPress={() => {
-                  // Simple battery level adjustment
                   const levels = [20, 40, 60, 80, 100];
                   const currentIndex = levels.indexOf(batteryLevel);
                   const nextIndex = (currentIndex + 1) % levels.length;
@@ -244,11 +276,12 @@ export default function RouteScreen() {
               <TouchableOpacity
                 style={styles.vehicleItem}
                 onPress={() => {
-                  // Simple range adjustment
-                  const ranges = [200, 300, 400, 500, 600];
-                  const currentIndex = ranges.indexOf(vehicleRange);
-                  const nextIndex = (currentIndex + 1) % ranges.length;
-                  setVehicleRange(ranges[nextIndex]);
+                  if (!activeVehicle) {
+                    const ranges = [200, 300, 400, 500, 600];
+                    const currentIndex = ranges.indexOf(vehicleRange);
+                    const nextIndex = (currentIndex + 1) % ranges.length;
+                    setVehicleRange(ranges[nextIndex]);
+                  }
                 }}
               >
                 <Ionicons name="speedometer" size={20} color={colors.textSecondary} />
@@ -260,9 +293,11 @@ export default function RouteScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-            <Text style={[styles.tapHint, { color: colors.textMuted }]}>
-              Klepněte pro změnu hodnot
-            </Text>
+            {!activeVehicle && (
+              <Text style={[styles.tapHint, { color: colors.textMuted }]}>
+                Klepněte pro změnu hodnot
+              </Text>
+            )}
           </View>
 
           {/* Error Message */}
@@ -521,6 +556,32 @@ const styles = StyleSheet.create({
     marginTop: Layout.spacing.lg,
     paddingTop: Layout.spacing.lg,
     borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  activeVehicleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Layout.spacing.md,
+    borderRadius: Layout.borderRadius.lg,
+    gap: Layout.spacing.md,
+  },
+  activeVehicleName: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
+  },
+  activeVehicleSpecs: {
+    fontSize: Layout.fontSize.xs,
+    marginTop: 2,
+  },
+  noVehicleBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Layout.spacing.sm,
+    borderRadius: Layout.borderRadius.md,
+    gap: Layout.spacing.sm,
+  },
+  noVehicleText: {
+    flex: 1,
+    fontSize: Layout.fontSize.xs,
   },
   vehicleRow: {
     flexDirection: 'row',

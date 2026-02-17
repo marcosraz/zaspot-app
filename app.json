@@ -27,15 +27,23 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
-      ]
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyDzcLf0M5KbNct0PBFmoEcfvtiUjBgPyP0"
+        }
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [
+      "expo-dev-client",
       "expo-router",
-      "expo-location"
+      "expo-location",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},

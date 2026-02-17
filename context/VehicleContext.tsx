@@ -1,10 +1,23 @@
 /**
  * Vehicle Context - Manages EV profile settings
  * Stores battery capacity, range, and charging preferences
+ * Supports server sync for authenticated users
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from './AuthContext';
+import { VehiclePreset, POPULAR_VEHICLES } from '../constants/vehiclePresets';
+import {
+  fetchVehicleProfiles,
+  createVehicleProfile,
+  updateVehicleProfile,
+  deleteVehicleProfile,
+  type ServerVehicleProfile,
+} from '../lib/vehicleProfiles';
+
+export type { VehiclePreset };
+export { POPULAR_VEHICLES };
 
 export interface VehicleProfile {
   id: string;
@@ -31,141 +44,15 @@ interface VehicleContextType {
   setCurrentBattery: (percent: number) => void;
   setPreferences: (minBattery: number, maxCharge: number) => void;
   isLoaded: boolean;
+  // Server sync
+  savedVehicles: ServerVehicleProfile[];
+  isSyncing: boolean;
+  saveToServer: (vehicle: VehicleProfile, isActive?: boolean) => Promise<ServerVehicleProfile | null>;
+  deleteFromServer: (vehicleId: string) => Promise<boolean>;
+  setActiveOnServer: (vehicleId: string) => Promise<boolean>;
+  refreshFromServer: () => Promise<void>;
+  activeVehicle: VehicleProfile | null;
 }
-
-const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
-
-const VEHICLE_STORAGE_KEY = '@zaspot_vehicle';
-
-// Popular EV models with specs
-export const POPULAR_VEHICLES: VehicleProfile[] = [
-  {
-    id: 'skoda-enyaq-iv-80',
-    name: 'Enyaq iV 80',
-    manufacturer: 'Škoda',
-    batteryCapacityKwh: 77,
-    rangeKm: 536,
-    maxChargingPowerKw: 135,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'skoda-enyaq-iv-60',
-    name: 'Enyaq iV 60',
-    manufacturer: 'Škoda',
-    batteryCapacityKwh: 58,
-    rangeKm: 412,
-    maxChargingPowerKw: 120,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'vw-id4-pro',
-    name: 'ID.4 Pro',
-    manufacturer: 'Volkswagen',
-    batteryCapacityKwh: 77,
-    rangeKm: 520,
-    maxChargingPowerKw: 135,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'vw-id3-pro',
-    name: 'ID.3 Pro',
-    manufacturer: 'Volkswagen',
-    batteryCapacityKwh: 58,
-    rangeKm: 426,
-    maxChargingPowerKw: 120,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'tesla-model-3-lr',
-    name: 'Model 3 Long Range',
-    manufacturer: 'Tesla',
-    batteryCapacityKwh: 75,
-    rangeKm: 602,
-    maxChargingPowerKw: 250,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'tesla-model-y-lr',
-    name: 'Model Y Long Range',
-    manufacturer: 'Tesla',
-    batteryCapacityKwh: 75,
-    rangeKm: 533,
-    maxChargingPowerKw: 250,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'hyundai-ioniq-5-lr',
-    name: 'IONIQ 5 Long Range',
-    manufacturer: 'Hyundai',
-    batteryCapacityKwh: 77.4,
-    rangeKm: 507,
-    maxChargingPowerKw: 220,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'kia-ev6-lr',
-    name: 'EV6 Long Range',
-    manufacturer: 'Kia',
-    batteryCapacityKwh: 77.4,
-    rangeKm: 528,
-    maxChargingPowerKw: 233,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'bmw-ix3',
-    name: 'iX3',
-    manufacturer: 'BMW',
-    batteryCapacityKwh: 74,
-    rangeKm: 461,
-    maxChargingPowerKw: 150,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'mercedes-eqa-250',
-    name: 'EQA 250',
-    manufacturer: 'Mercedes-Benz',
-    batteryCapacityKwh: 66.5,
-    rangeKm: 426,
-    maxChargingPowerKw: 100,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'peugeot-e-208',
-    name: 'e-208',
-    manufacturer: 'Peugeot',
-    batteryCapacityKwh: 50,
-    rangeKm: 362,
-    maxChargingPowerKw: 100,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'renault-zoe',
-    name: 'Zoe R135',
-    manufacturer: 'Renault',
-    batteryCapacityKwh: 52,
-    rangeKm: 395,
-    maxChargingPowerKw: 50,
-    connectorType: 'Type 2',
-  },
-  {
-    id: 'cupra-born',
-    name: 'Born',
-    manufacturer: 'Cupra',
-    batteryCapacityKwh: 58,
-    rangeKm: 424,
-    maxChargingPowerKw: 120,
-    connectorType: 'CCS2',
-  },
-  {
-    id: 'audi-q4-etron',
-    name: 'Q4 e-tron 50',
-    manufacturer: 'Audi',
-    batteryCapacityKwh: 76.6,
-    rangeKm: 488,
-    maxChargingPowerKw: 135,
-    connectorType: 'CCS2',
-  },
-];
 
 const defaultSettings: VehicleSettings = {
   selectedVehicle: null,
@@ -182,16 +69,32 @@ interface VehicleProviderProps {
 export function VehicleProvider({ children }: VehicleProviderProps) {
   const [settings, setSettings] = useState<VehicleSettings>(defaultSettings);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [savedVehicles, setSavedVehicles] = useState<ServerVehicleProfile[]>([]);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { user } = useAuth();
+  const hasSyncedRef = useRef(false);
 
-  // Load settings on mount
+  // Load local settings on mount
   useEffect(() => {
     loadSettings();
   }, []);
 
-  // Save settings when they change
+  // Sync with server when user logs in
+  useEffect(() => {
+    if (user && isLoaded && !hasSyncedRef.current) {
+      hasSyncedRef.current = true;
+      refreshFromServer();
+    }
+    if (!user) {
+      hasSyncedRef.current = false;
+      setSavedVehicles([]);
+    }
+  }, [user, isLoaded]);
+
+  // Save local settings when they change
   useEffect(() => {
     if (isLoaded) {
-      saveSettings(settings);
+      saveLocalSettings(settings);
     }
   }, [settings, isLoaded]);
 
@@ -209,13 +112,98 @@ export function VehicleProvider({ children }: VehicleProviderProps) {
     }
   };
 
-  const saveSettings = async (newSettings: VehicleSettings) => {
+  const saveLocalSettings = async (newSettings: VehicleSettings) => {
     try {
       await AsyncStorage.setItem(VEHICLE_STORAGE_KEY, JSON.stringify(newSettings));
     } catch (error) {
       console.error('Failed to save vehicle settings:', error);
     }
   };
+
+  // Server sync methods
+  const refreshFromServer = useCallback(async () => {
+    if (!user) return;
+    setIsSyncing(true);
+    try {
+      const vehicles = await fetchVehicleProfiles();
+      setSavedVehicles(vehicles);
+      // If there's an active server vehicle, update local settings
+      const active = vehicles.find(v => v.isActive);
+      if (active) {
+        setSettings(prev => ({
+          ...prev,
+          selectedVehicle: {
+            id: active.presetId || active.id,
+            name: active.name,
+            manufacturer: active.manufacturer,
+            batteryCapacityKwh: active.batteryCapacityKwh,
+            rangeKm: active.rangeKm,
+            maxChargingPowerKw: active.maxChargingPowerKw,
+            connectorType: active.connectorType,
+          },
+          preferredMinBattery: active.preferredMinBattery ?? 15,
+          preferredMaxCharge: active.preferredMaxCharge ?? 80,
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to sync vehicles from server:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [user]);
+
+  const saveToServer = useCallback(async (vehicle: VehicleProfile, isActive = true): Promise<ServerVehicleProfile | null> => {
+    if (!user) return null;
+    try {
+      const result = await createVehicleProfile({
+        presetId: vehicle.id,
+        name: vehicle.name,
+        manufacturer: vehicle.manufacturer,
+        batteryCapacityKwh: vehicle.batteryCapacityKwh,
+        rangeKm: vehicle.rangeKm,
+        maxChargingPowerKw: vehicle.maxChargingPowerKw,
+        connectorType: vehicle.connectorType,
+        preferredMinBattery: settings.preferredMinBattery,
+        preferredMaxCharge: settings.preferredMaxCharge,
+        isActive,
+      });
+      if (result) {
+        await refreshFromServer();
+      }
+      return result;
+    } catch (error) {
+      console.error('Failed to save vehicle to server:', error);
+      return null;
+    }
+  }, [user, settings.preferredMinBattery, settings.preferredMaxCharge, refreshFromServer]);
+
+  const deleteFromServer = useCallback(async (vehicleId: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const success = await deleteVehicleProfile(vehicleId);
+      if (success) {
+        await refreshFromServer();
+      }
+      return success;
+    } catch (error) {
+      console.error('Failed to delete vehicle from server:', error);
+      return false;
+    }
+  }, [user, refreshFromServer]);
+
+  const setActiveOnServer = useCallback(async (vehicleId: string): Promise<boolean> => {
+    if (!user) return false;
+    try {
+      const result = await updateVehicleProfile(vehicleId, { isActive: true });
+      if (result) {
+        await refreshFromServer();
+      }
+      return !!result;
+    } catch (error) {
+      console.error('Failed to set active vehicle on server:', error);
+      return false;
+    }
+  }, [user, refreshFromServer]);
 
   const setSelectedVehicle = useCallback((vehicle: VehicleProfile | null) => {
     setSettings(prev => ({ ...prev, selectedVehicle: vehicle }));
@@ -237,6 +225,9 @@ export function VehicleProvider({ children }: VehicleProviderProps) {
     }));
   }, []);
 
+  // Active vehicle: server vehicle (if synced) or local selection
+  const activeVehicle = settings.selectedVehicle || settings.customVehicle || null;
+
   return (
     <VehicleContext.Provider
       value={{
@@ -246,6 +237,13 @@ export function VehicleProvider({ children }: VehicleProviderProps) {
         setCurrentBattery,
         setPreferences,
         isLoaded,
+        savedVehicles,
+        isSyncing,
+        saveToServer,
+        deleteFromServer,
+        setActiveOnServer,
+        refreshFromServer,
+        activeVehicle,
       }}
     >
       {children}

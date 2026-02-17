@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ChargingStation } from '../lib/supabase';
+import { ChargingStation } from '../lib/stations';
 import { Colors } from '../constants/colors';
 
 interface CustomMarkerProps {

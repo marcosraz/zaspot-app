@@ -1,6 +1,6 @@
 /**
  * Notifications Context - Manages push notifications and price alerts
- * Allows users to set price thresholds for notifications
+ * Handles push token registration, price alerts, charging & reservation reminders
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import { apiFetch } from '../lib/api';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -29,6 +30,7 @@ export interface PriceAlert {
 
 interface NotificationSettings {
   permissionGranted: boolean;
+  pushToken: string | null;
   priceAlerts: PriceAlert[];
   lastNotificationTime: number | null;
 }
@@ -36,6 +38,7 @@ interface NotificationSettings {
 interface NotificationsContextType {
   settings: NotificationSettings;
   hasPermission: boolean;
+  pushToken: string | null;
   requestPermission: () => Promise<boolean>;
   addPriceAlert: (alert: Omit<PriceAlert, 'id'>) => void;
   removePriceAlert: (id: string) => void;
@@ -43,16 +46,22 @@ interface NotificationsContextType {
   updatePriceAlert: (id: string, updates: Partial<PriceAlert>) => void;
   checkPriceAndNotify: (currentPrice: number) => Promise<void>;
   sendTestNotification: () => Promise<void>;
+  scheduleReservationReminder: (reservationId: string, stationName: string, startTime: string) => Promise<void>;
+  cancelReservationReminder: (reservationId: string) => Promise<void>;
+  notifyChargingStarted: (stationName: string) => Promise<void>;
+  notifyChargingComplete: (stationName: string, energyKwh: number, costCzk?: number) => Promise<void>;
   isLoaded: boolean;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
 
 const NOTIFICATIONS_STORAGE_KEY = '@zaspot_notifications';
-const NOTIFICATION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown between notifications
+const NOTIFICATION_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown between price notifications
+const RESERVATION_REMINDER_MINUTES = 30; // Remind 30 minutes before reservation
 
 const defaultSettings: NotificationSettings = {
   permissionGranted: false,
+  pushToken: null,
   priceAlerts: [
     {
       id: 'default-low',
@@ -140,11 +149,53 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#16A34A',
       });
+
+      // Separate channel for charging updates
+      await Notifications.setNotificationChannelAsync('charging', {
+        name: 'Charging',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250],
+        lightColor: '#16A34A',
+      });
+
+      // Separate channel for reservations
+      await Notifications.setNotificationChannelAsync('reservations', {
+        name: 'Reservations',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250],
+        lightColor: '#8B5CF6',
+      });
     }
 
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     if (existingStatus === 'granted') {
       setSettings(prev => ({ ...prev, permissionGranted: true }));
+      await getPushTokenAndRegister();
+    }
+  };
+
+  // Get Expo push token and register with backend
+  const getPushTokenAndRegister = async () => {
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: '5fde0a0a-a4f2-4abc-8023-245acefc126b',
+      });
+      const token = tokenData.data;
+
+      setSettings(prev => ({ ...prev, pushToken: token }));
+
+      // Register token with backend for server-sent notifications
+      await apiFetch('/notifications/register-token', {
+        method: 'POST',
+        body: JSON.stringify({
+          token,
+          platform: Platform.OS,
+          deviceName: Device.deviceName,
+        }),
+        requireAuth: true,
+      });
+    } catch (error) {
+      console.log('Push token registration skipped:', error);
     }
   };
 
@@ -163,6 +214,10 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
 
     const granted = finalStatus === 'granted';
     setSettings(prev => ({ ...prev, permissionGranted: granted }));
+
+    if (granted) {
+      await getPushTokenAndRegister();
+    }
     return granted;
   }, []);
 
@@ -253,11 +308,86 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     });
   }, [settings.permissionGranted, requestPermission]);
 
+  /**
+   * Schedule a local notification reminder before a reservation
+   */
+  const scheduleReservationReminder = useCallback(async (
+    reservationId: string,
+    stationName: string,
+    startTime: string
+  ) => {
+    if (!settings.permissionGranted) return;
+
+    const reminderTime = new Date(startTime);
+    reminderTime.setMinutes(reminderTime.getMinutes() - RESERVATION_REMINDER_MINUTES);
+
+    // Don't schedule if reminder time has already passed
+    if (reminderTime <= new Date()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Rezervace začíná brzy',
+        body: `Vaše rezervace na ${stationName} začíná za ${RESERVATION_REMINDER_MINUTES} minut.`,
+        data: { type: 'reservation_reminder', reservationId },
+        ...(Platform.OS === 'android' && { channelId: 'reservations' }),
+      },
+      trigger: { date: reminderTime, type: Notifications.SchedulableTriggerInputTypes.DATE },
+      identifier: `reservation-${reservationId}`,
+    });
+  }, [settings.permissionGranted]);
+
+  /**
+   * Cancel a scheduled reservation reminder
+   */
+  const cancelReservationReminder = useCallback(async (reservationId: string) => {
+    await Notifications.cancelScheduledNotificationAsync(`reservation-${reservationId}`);
+  }, []);
+
+  /**
+   * Show notification when charging starts
+   */
+  const notifyChargingStarted = useCallback(async (stationName: string) => {
+    if (!settings.permissionGranted) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Nabíjení zahájeno',
+        body: `Nabíjení na ${stationName} bylo úspěšně zahájeno.`,
+        data: { type: 'charging_started' },
+        ...(Platform.OS === 'android' && { channelId: 'charging' }),
+      },
+      trigger: null,
+    });
+  }, [settings.permissionGranted]);
+
+  /**
+   * Show notification when charging completes
+   */
+  const notifyChargingComplete = useCallback(async (
+    stationName: string,
+    energyKwh: number,
+    costCzk?: number
+  ) => {
+    if (!settings.permissionGranted) return;
+
+    const costText = costCzk != null ? ` • ${costCzk.toFixed(2)} CZK` : '';
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Nabíjení dokončeno',
+        body: `${stationName}: ${energyKwh.toFixed(2)} kWh${costText}`,
+        data: { type: 'charging_complete' },
+        ...(Platform.OS === 'android' && { channelId: 'charging' }),
+      },
+      trigger: null,
+    });
+  }, [settings.permissionGranted]);
+
   return (
     <NotificationsContext.Provider
       value={{
         settings,
         hasPermission: settings.permissionGranted,
+        pushToken: settings.pushToken,
         requestPermission,
         addPriceAlert,
         removePriceAlert,
@@ -265,6 +395,10 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         updatePriceAlert,
         checkPriceAndNotify,
         sendTestNotification,
+        scheduleReservationReminder,
+        cancelReservationReminder,
+        notifyChargingStarted,
+        notifyChargingComplete,
         isLoaded,
       }}
     >

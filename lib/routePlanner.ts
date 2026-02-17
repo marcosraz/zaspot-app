@@ -2,7 +2,8 @@
  * Route Planner - Calculate optimal charging stops
  */
 
-import { ChargingStation, fetchNearbyStations } from './supabase';
+import { ChargingStation, fetchNearbyStations } from './stations';
+import { getCompatibleConnectors } from '../constants/vehiclePresets';
 
 export interface RoutePoint {
   latitude: number;
@@ -70,10 +71,15 @@ function calculateDrivingTime(distanceKm: number): number {
 function calculateChargingTime(
   percentToAdd: number,
   batteryCapacityKwh: number,
-  chargerPowerKw: number
+  chargerPowerKw: number,
+  vehicleMaxPowerKw?: number
 ): number {
   const energyNeeded = (percentToAdd / 100) * batteryCapacityKwh;
-  const effectivePower = chargerPowerKw * CHARGING_EFFICIENCY;
+  // Vehicle can only accept up to its max charging power
+  const actualPower = vehicleMaxPowerKw
+    ? Math.min(chargerPowerKw, vehicleMaxPowerKw)
+    : chargerPowerKw;
+  const effectivePower = actualPower * CHARGING_EFFICIENCY;
   // Simplified: assumes linear charging (in reality it's curved)
   return (energyNeeded / effectivePower) * 60; // minutes
 }
@@ -96,7 +102,9 @@ export async function planRoute(
   to: RoutePoint,
   currentBatteryPercent: number,
   vehicleRangeKm: number,
-  batteryCapacityKwh: number = 60
+  batteryCapacityKwh: number = 60,
+  maxChargingPowerKw?: number,
+  connectorType?: string
 ): Promise<RouteResult> {
   const totalDistance = calculateDistance(
     from.latitude,
@@ -138,9 +146,24 @@ export async function planRoute(
 
   const allStations = await fetchNearbyStations(midLat, midLon, searchRadius);
 
+  // Filter by connector compatibility
+  const compatibleConnectors = connectorType ? getCompatibleConnectors(connectorType) : null;
+  const compatibleStations = compatibleConnectors
+    ? allStations.filter(station => {
+        // Check if station has a compatible connector type
+        if (station.connector_types && Array.isArray(station.connector_types)) {
+          return station.connector_types.some((ct: string) =>
+            compatibleConnectors.some(cc => ct.toLowerCase().includes(cc.toLowerCase()))
+          );
+        }
+        // If no connector info, include by default
+        return true;
+      })
+    : allStations;
+
   // Filter stations that are roughly along the route
   // Simple heuristic: station should be between from and to
-  const stationsAlongRoute = allStations.filter(station => {
+  const stationsAlongRoute = compatibleStations.filter(station => {
     const distToFrom = calculateDistance(
       from.latitude,
       from.longitude,
@@ -225,7 +248,8 @@ export async function planRoute(
     const chargeTime = calculateChargingTime(
       chargeAmount,
       batteryCapacityKwh,
-      bestStation.power_kw
+      bestStation.power_kw,
+      maxChargingPowerKw
     );
 
     const pricePerKwh = bestStation.price_per_kwh || 8; // Default price

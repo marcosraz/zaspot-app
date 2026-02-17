@@ -12,6 +12,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { LanguageProvider } from '../context/LanguageContext';
+import { AuthProvider } from '../context/AuthContext';
+import { CreditProvider } from '../context/CreditContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
 import { VehicleProvider } from '../context/VehicleContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
@@ -33,12 +35,31 @@ function RootLayoutNav() {
           animation: 'slide_from_right',
         }}
       >
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
-          name="station/[id]"
+          name="station/[id]/index"
           options={{
             presentation: 'modal',
             animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="history/index"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="reservations/index"
+          options={{
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="receipt/[transactionId]/index"
+          options={{
+            animation: 'slide_from_right',
           }}
         />
       </Stack>
@@ -98,13 +119,17 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <FavoritesProvider>
-              <VehicleProvider>
-                <NotificationsProvider>
-                  <AppContent />
-                </NotificationsProvider>
-              </VehicleProvider>
-            </FavoritesProvider>
+            <AuthProvider>
+              <CreditProvider>
+                <FavoritesProvider>
+                <VehicleProvider>
+                  <NotificationsProvider>
+                    <AppContent />
+                  </NotificationsProvider>
+                </VehicleProvider>
+              </FavoritesProvider>
+              </CreditProvider>
+            </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>
       </SafeAreaProvider>

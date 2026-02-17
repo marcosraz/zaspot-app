@@ -104,6 +104,8 @@ export interface Translations {
     calculating: string;
     batteryLevel: string;
     vehicleRange: string;
+    noVehicleHint: string;
+    activeVehicle: string;
   };
 
   // Profile screen
@@ -113,6 +115,13 @@ export interface Translations {
     language: string;
     theme: string;
     notifications: string;
+    vehicleProfile: string;
+    saveToAccount: string;
+    synced: string;
+    localOnly: string;
+    customVehicle: string;
+    batteryCapacity: string;
+    maxChargingPower: string;
     priceAlerts: string;
     reservations: string;
     history: string;
@@ -265,6 +274,8 @@ export const translations: Record<Language, Translations> = {
       calculating: 'Vypočítávám...',
       batteryLevel: 'Stav baterie',
       vehicleRange: 'Dojezd vozidla',
+      noVehicleHint: 'Vyberte si vozidlo v profilu pro přesnější výpočet',
+      activeVehicle: 'Aktivní vozidlo',
     },
     profile: {
       title: 'Profil',
@@ -274,6 +285,13 @@ export const translations: Record<Language, Translations> = {
       notifications: 'Oznámení',
       priceAlerts: 'Cenové alerty',
       reservations: 'Moje rezervace',
+      vehicleProfile: 'Profil vozidla',
+      saveToAccount: 'Uložit na účet',
+      synced: 'Synchronizováno',
+      localOnly: 'Pouze lokálně',
+      customVehicle: 'Vlastní vozidlo',
+      batteryCapacity: 'Kapacita baterie',
+      maxChargingPower: 'Max. nabíjecí výkon',
       history: 'Historie nabíjení',
       about: 'O aplikaci',
       help: 'Nápověda',
@@ -417,6 +435,8 @@ export const translations: Record<Language, Translations> = {
       calculating: 'Calculating...',
       batteryLevel: 'Battery Level',
       vehicleRange: 'Vehicle Range',
+      noVehicleHint: 'Select a vehicle in your profile for more accurate calculations',
+      activeVehicle: 'Active Vehicle',
     },
     profile: {
       title: 'Profile',
@@ -426,6 +446,13 @@ export const translations: Record<Language, Translations> = {
       notifications: 'Notifications',
       priceAlerts: 'Price Alerts',
       reservations: 'My Reservations',
+      vehicleProfile: 'Vehicle Profile',
+      saveToAccount: 'Save to Account',
+      synced: 'Synced',
+      localOnly: 'Local Only',
+      customVehicle: 'Custom Vehicle',
+      batteryCapacity: 'Battery Capacity',
+      maxChargingPower: 'Max Charging Power',
       history: 'Charging History',
       about: 'About App',
       help: 'Help',
@@ -569,6 +596,8 @@ export const translations: Record<Language, Translations> = {
       calculating: 'Berechne...',
       batteryLevel: 'Akkustand',
       vehicleRange: 'Reichweite',
+      noVehicleHint: 'Wählen Sie ein Fahrzeug im Profil für genauere Berechnungen',
+      activeVehicle: 'Aktives Fahrzeug',
     },
     profile: {
       title: 'Profil',
@@ -578,6 +607,13 @@ export const translations: Record<Language, Translations> = {
       notifications: 'Benachrichtigungen',
       priceAlerts: 'Preisalarme',
       reservations: 'Meine Reservierungen',
+      vehicleProfile: 'Fahrzeugprofil',
+      saveToAccount: 'Im Konto speichern',
+      synced: 'Synchronisiert',
+      localOnly: 'Nur lokal',
+      customVehicle: 'Eigenes Fahrzeug',
+      batteryCapacity: 'Batteriekapazität',
+      maxChargingPower: 'Max. Ladeleistung',
       history: 'Ladehistorie',
       about: 'Über die App',
       help: 'Hilfe',
@@ -721,6 +757,8 @@ export const translations: Record<Language, Translations> = {
       calculating: 'Obliczanie...',
       batteryLevel: 'Poziom baterii',
       vehicleRange: 'Zasięg pojazdu',
+      noVehicleHint: 'Wybierz pojazd w profilu, aby uzyskać dokładniejsze obliczenia',
+      activeVehicle: 'Aktywny pojazd',
     },
     profile: {
       title: 'Profil',
@@ -730,6 +768,13 @@ export const translations: Record<Language, Translations> = {
       notifications: 'Powiadomienia',
       priceAlerts: 'Alerty cenowe',
       reservations: 'Moje rezerwacje',
+      vehicleProfile: 'Profil pojazdu',
+      saveToAccount: 'Zapisz na koncie',
+      synced: 'Zsynchronizowane',
+      localOnly: 'Tylko lokalnie',
+      customVehicle: 'Własny pojazd',
+      batteryCapacity: 'Pojemność baterii',
+      maxChargingPower: 'Maks. moc ładowania',
       history: 'Historia ładowania',
       about: 'O aplikacji',
       help: 'Pomoc',
