@@ -26,6 +26,7 @@ import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotifications } from '../../../context/NotificationsContext';
 import { Colors } from '../../../constants/colors';
 import { Layout } from '../../../constants/layout';
+import { getLocale } from '../../../constants/translations';
 import {
   ChargePointDetail,
   Connector,
@@ -41,226 +42,17 @@ import {
 import { fetchEffectivePrices, EffectivePrices, formatPrice } from '../../../lib/pricing';
 import { createReservation } from '../../../lib/reservations';
 
-// ─── Translations ────────────────────────────────
-
-const labels: Record<string, Record<string, string>> = {
-  cz: {
-    loading: 'Načítání stanice...',
-    error: 'Stanice nenalezena',
-    back: 'Zpět',
-    online: 'Online',
-    offline: 'Offline',
-    connectors: 'Konektory',
-    startCharging: 'Spustit nabíjení',
-    stopCharging: 'Zastavit nabíjení',
-    navigate: 'Navigovat',
-    favorite: 'Oblíbená',
-    loginRequired: 'Pro nabíjení se přihlaste',
-    login: 'Přihlásit se',
-    starting: 'Spouštím...',
-    stopping: 'Zastavuji...',
-    activeSession: 'Aktivní nabíjení',
-    energy: 'Energie',
-    duration: 'Doba',
-    cost: 'Náklady',
-    power: 'Výkon',
-    soc: 'Stav baterie',
-    stats: 'Statistiky',
-    totalSessions: 'Celkem nabíjení',
-    totalEnergy: 'Celkem energie',
-    confirmStop: 'Opravdu chcete zastavit nabíjení?',
-    yes: 'Ano',
-    no: 'Ne',
-    errorStarting: 'Chyba při spouštění nabíjení',
-    errorStopping: 'Chyba při zastavování nabíjení',
-    insufficientCredit: 'Nedostatečný kredit (min. 10 CZK)',
-    stationOffline: 'Stanice je offline',
-    currentPrices: 'Aktuální ceny',
-    acPrice: 'AC nabíjení',
-    dcPrice: 'DC nabíjení',
-    spotPrice: 'Spotová cena',
-    perKwh: 'CZK/kWh',
-    timeSlot: 'Časový slot',
-    Available: 'Dostupný',
-    Charging: 'Nabíjí',
-    Preparing: 'Připravuje se',
-    Faulted: 'Porucha',
-    Unavailable: 'Nedostupný',
-    SuspendedEV: 'Pozastaveno (EV)',
-    SuspendedEVSE: 'Pozastaveno',
-    reserve: 'Rezervovat',
-    reserveConfirm: 'Rezervovat konektor na 30 minut?',
-    reserveDeposit: 'Záloha',
-    reserveSuccess: 'Rezervace vytvořena',
-    reserveError: 'Chyba při rezervaci',
-    reserving: 'Rezervuji...',
-  },
-  en: {
-    loading: 'Loading station...',
-    error: 'Station not found',
-    back: 'Back',
-    online: 'Online',
-    offline: 'Offline',
-    connectors: 'Connectors',
-    startCharging: 'Start Charging',
-    stopCharging: 'Stop Charging',
-    navigate: 'Navigate',
-    favorite: 'Favorite',
-    loginRequired: 'Sign in to start charging',
-    login: 'Sign In',
-    starting: 'Starting...',
-    stopping: 'Stopping...',
-    activeSession: 'Active Charging',
-    energy: 'Energy',
-    duration: 'Duration',
-    cost: 'Cost',
-    power: 'Power',
-    soc: 'Battery',
-    stats: 'Statistics',
-    totalSessions: 'Total sessions',
-    totalEnergy: 'Total energy',
-    confirmStop: 'Do you want to stop charging?',
-    yes: 'Yes',
-    no: 'No',
-    errorStarting: 'Error starting charging',
-    errorStopping: 'Error stopping charging',
-    insufficientCredit: 'Insufficient credit (min. 10 CZK)',
-    stationOffline: 'Station is offline',
-    currentPrices: 'Current Prices',
-    acPrice: 'AC Charging',
-    dcPrice: 'DC Charging',
-    spotPrice: 'Spot Price',
-    perKwh: 'CZK/kWh',
-    timeSlot: 'Time slot',
-    Available: 'Available',
-    Charging: 'Charging',
-    Preparing: 'Preparing',
-    Faulted: 'Faulted',
-    Unavailable: 'Unavailable',
-    SuspendedEV: 'Suspended (EV)',
-    SuspendedEVSE: 'Suspended',
-    reserve: 'Reserve',
-    reserveConfirm: 'Reserve connector for 30 minutes?',
-    reserveDeposit: 'Deposit',
-    reserveSuccess: 'Reservation created',
-    reserveError: 'Reservation error',
-    reserving: 'Reserving...',
-  },
-  de: {
-    loading: 'Station wird geladen...',
-    error: 'Station nicht gefunden',
-    back: 'Zurück',
-    online: 'Online',
-    offline: 'Offline',
-    connectors: 'Anschlüsse',
-    startCharging: 'Laden starten',
-    stopCharging: 'Laden stoppen',
-    navigate: 'Navigieren',
-    favorite: 'Favorit',
-    loginRequired: 'Anmelden zum Laden',
-    login: 'Anmelden',
-    starting: 'Wird gestartet...',
-    stopping: 'Wird gestoppt...',
-    activeSession: 'Aktives Laden',
-    energy: 'Energie',
-    duration: 'Dauer',
-    cost: 'Kosten',
-    power: 'Leistung',
-    soc: 'Akkustand',
-    stats: 'Statistiken',
-    totalSessions: 'Gesamte Ladevorgänge',
-    totalEnergy: 'Gesamte Energie',
-    confirmStop: 'Möchten Sie das Laden stoppen?',
-    yes: 'Ja',
-    no: 'Nein',
-    errorStarting: 'Fehler beim Starten',
-    errorStopping: 'Fehler beim Stoppen',
-    insufficientCredit: 'Unzureichendes Guthaben (min. 10 CZK)',
-    stationOffline: 'Station ist offline',
-    currentPrices: 'Aktuelle Preise',
-    acPrice: 'AC-Laden',
-    dcPrice: 'DC-Laden',
-    spotPrice: 'Spotpreis',
-    perKwh: 'CZK/kWh',
-    timeSlot: 'Zeitfenster',
-    Available: 'Verfügbar',
-    Charging: 'Lädt',
-    Preparing: 'Vorbereitung',
-    Faulted: 'Störung',
-    Unavailable: 'Nicht verfügbar',
-    SuspendedEV: 'Pausiert (EV)',
-    SuspendedEVSE: 'Pausiert',
-    reserve: 'Reservieren',
-    reserveConfirm: 'Anschluss für 30 Min reservieren?',
-    reserveDeposit: 'Kaution',
-    reserveSuccess: 'Reservierung erstellt',
-    reserveError: 'Reservierungsfehler',
-    reserving: 'Reserviere...',
-  },
-  pl: {
-    loading: 'Ładowanie stacji...',
-    error: 'Stacja nie znaleziona',
-    back: 'Wstecz',
-    online: 'Online',
-    offline: 'Offline',
-    connectors: 'Złącza',
-    startCharging: 'Rozpocznij ładowanie',
-    stopCharging: 'Zatrzymaj ładowanie',
-    navigate: 'Nawiguj',
-    favorite: 'Ulubiona',
-    loginRequired: 'Zaloguj się, aby ładować',
-    login: 'Zaloguj się',
-    starting: 'Uruchamianie...',
-    stopping: 'Zatrzymywanie...',
-    activeSession: 'Aktywne ładowanie',
-    energy: 'Energia',
-    duration: 'Czas',
-    cost: 'Koszt',
-    power: 'Moc',
-    soc: 'Bateria',
-    stats: 'Statystyki',
-    totalSessions: 'Wszystkie sesje',
-    totalEnergy: 'Całkowita energia',
-    confirmStop: 'Czy chcesz zatrzymać ładowanie?',
-    yes: 'Tak',
-    no: 'Nie',
-    errorStarting: 'Błąd uruchamiania ładowania',
-    errorStopping: 'Błąd zatrzymywania ładowania',
-    insufficientCredit: 'Niewystarczające saldo (min. 10 CZK)',
-    stationOffline: 'Stacja jest offline',
-    currentPrices: 'Aktualne ceny',
-    acPrice: 'Ładowanie AC',
-    dcPrice: 'Ładowanie DC',
-    spotPrice: 'Cena spot',
-    perKwh: 'CZK/kWh',
-    timeSlot: 'Przedział czasu',
-    Available: 'Dostępny',
-    Charging: 'Ładuje',
-    Preparing: 'Przygotowanie',
-    Faulted: 'Awaria',
-    Unavailable: 'Niedostępny',
-    SuspendedEV: 'Wstrzymano (EV)',
-    SuspendedEVSE: 'Wstrzymano',
-    reserve: 'Zarezerwuj',
-    reserveConfirm: 'Zarezerwować złącze na 30 minut?',
-    reserveDeposit: 'Kaucja',
-    reserveSuccess: 'Rezerwacja utworzona',
-    reserveError: 'Błąd rezerwacji',
-    reserving: 'Rezerwuję...',
-  },
-};
-
 // ─── Component ───────────────────────────────────
 
 export default function StationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors, isDark } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { notifyChargingStarted, notifyChargingComplete } = useNotifications();
 
-  const l = labels[language] || labels.en;
+  const l = t.station;
 
   const [station, setStation] = useState<ChargePointDetail | null>(null);
   const [sessions, setSessions] = useState<ChargingSession[]>([]);
@@ -283,8 +75,8 @@ export default function StationDetailScreen() {
 
     if (data) {
       setStation(data);
-      // Fetch active sessions
-      const activeSessions = await fetchActiveSessions(data.chargePointId);
+      // Fetch active sessions (use UUID, not OCPP identity)
+      const activeSessions = await fetchActiveSessions(data.id);
       setSessions(activeSessions);
     }
     if (effectivePrices) setPrices(effectivePrices);
@@ -384,7 +176,7 @@ export default function StationDetailScreen() {
     if (mins >= 30) nextSlot.setHours(nextSlot.getHours());
 
     const startTime = nextSlot.toISOString();
-    const timeStr = nextSlot.toLocaleTimeString(language === 'cz' ? 'cs-CZ' : 'en-US', {
+    const timeStr = nextSlot.toLocaleTimeString(getLocale(language), {
       hour: '2-digit', minute: '2-digit',
     });
 
@@ -394,7 +186,7 @@ export default function StationDetailScreen() {
 
     Alert.alert(
       l.reserve,
-      `${l.reserveConfirm}\n${timeStr} — ${new Date(nextSlot.getTime() + 30 * 60000).toLocaleTimeString(language === 'cz' ? 'cs-CZ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}${depositText}`,
+      `${l.reserveConfirm}\n${timeStr} — ${new Date(nextSlot.getTime() + 30 * 60000).toLocaleTimeString(getLocale(language), { hour: '2-digit', minute: '2-digit' })}${depositText}`,
       [
         { text: l.no, style: 'cancel' },
         {
@@ -633,7 +425,7 @@ export default function StationDetailScreen() {
                 <View style={[styles.statusBadge, { backgroundColor: statusColor + '15' }]}>
                   <View style={[styles.statusIndicator, { backgroundColor: statusColor }]} />
                   <Text style={[styles.statusText, { color: statusColor }]}>
-                    {l[connector.status] || connector.status}
+                    {l[`status${connector.status}` as keyof typeof l] || connector.status}
                   </Text>
                 </View>
               </View>
