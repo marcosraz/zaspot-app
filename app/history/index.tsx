@@ -21,69 +21,13 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { getLocale } from '../../constants/translations';
 import { UserTransaction, fetchUserTransactions, formatDuration, formatEnergy } from '../../lib/charging';
-
-const labels: Record<string, Record<string, string>> = {
-  cz: {
-    title: 'Historie nabíjení',
-    noHistory: 'Zatím žádné nabíjení',
-    noHistoryDesc: 'Po prvním nabíjení se zde zobrazí vaše historie.',
-    active: 'Aktivní',
-    completed: 'Dokončeno',
-    viewReceipt: 'Zobrazit účtenku',
-    loginRequired: 'Pro zobrazení historie se přihlaste.',
-    login: 'Přihlásit se',
-    energy: 'Energie',
-    cost: 'Náklady',
-    date: 'Datum',
-  },
-  en: {
-    title: 'Charging History',
-    noHistory: 'No charging yet',
-    noHistoryDesc: 'Your history will appear here after your first charge.',
-    active: 'Active',
-    completed: 'Completed',
-    viewReceipt: 'View receipt',
-    loginRequired: 'Sign in to see your history.',
-    login: 'Sign In',
-    energy: 'Energy',
-    cost: 'Cost',
-    date: 'Date',
-  },
-  de: {
-    title: 'Ladehistorie',
-    noHistory: 'Noch keine Ladevorgänge',
-    noHistoryDesc: 'Ihre Historie erscheint hier nach dem ersten Laden.',
-    active: 'Aktiv',
-    completed: 'Abgeschlossen',
-    viewReceipt: 'Beleg anzeigen',
-    loginRequired: 'Melden Sie sich an, um Ihre Historie zu sehen.',
-    login: 'Anmelden',
-    energy: 'Energie',
-    cost: 'Kosten',
-    date: 'Datum',
-  },
-  pl: {
-    title: 'Historia ładowania',
-    noHistory: 'Brak historii ładowania',
-    noHistoryDesc: 'Twoja historia pojawi się tutaj po pierwszym ładowaniu.',
-    active: 'Aktywne',
-    completed: 'Zakończone',
-    viewReceipt: 'Zobacz rachunek',
-    loginRequired: 'Zaloguj się, aby zobaczyć historię.',
-    login: 'Zaloguj się',
-    energy: 'Energia',
-    cost: 'Koszt',
-    date: 'Data',
-  },
-};
 
 export default function HistoryScreen() {
   const { colors } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { isAuthenticated } = useAuth();
-
-  const l = labels[language] || labels.en;
 
   const [transactions, setTransactions] = useState<UserTransaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,6 +53,16 @@ export default function HistoryScreen() {
     loadTransactions();
   }, [loadTransactions]);
 
+  // Auto-refresh every 15s when there are active transactions
+  useEffect(() => {
+    const hasActive = transactions.some((tx) => tx.status === 'active');
+    if (!hasActive) return;
+    const interval = setInterval(() => {
+      loadTransactions();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [transactions, loadTransactions]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadTransactions();
@@ -117,7 +71,7 @@ export default function HistoryScreen() {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(language === 'cz' ? 'cs-CZ' : language === 'de' ? 'de-DE' : language === 'pl' ? 'pl-PL' : 'en-US', {
+    return d.toLocaleDateString(getLocale(language), {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
@@ -138,17 +92,17 @@ export default function HistoryScreen() {
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{l.title}</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t.history.title}</Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.emptyContainer}>
           <Ionicons name="log-in-outline" size={48} color={colors.textMuted} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{l.loginRequired}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.history.loginRequired}</Text>
           <TouchableOpacity
             onPress={() => router.push('/(auth)/login')}
             style={[styles.loginBtn, { backgroundColor: Colors.brand.accentGreen }]}
           >
-            <Text style={styles.loginBtnText}>{l.login}</Text>
+            <Text style={styles.loginBtnText}>{t.history.login}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -185,33 +139,60 @@ export default function HistoryScreen() {
             {isActive && (
               <View style={[styles.activeBadge, { backgroundColor: '#3B82F620' }]}>
                 <View style={[styles.activeDot, { backgroundColor: '#3B82F6' }]} />
-                <Text style={{ color: '#3B82F6', fontSize: 11, fontWeight: '600' }}>{l.active}</Text>
+                <Text style={{ color: '#3B82F6', fontSize: 11, fontWeight: '600' }}>{t.history.active}</Text>
               </View>
             )}
           </View>
         </View>
 
         <View style={styles.txStats}>
-          <View style={styles.txStat}>
-            <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{l.energy}</Text>
-            <Text style={[styles.txStatValue, { color: colors.text }]}>
-              {formatEnergy(tx.energyKwh)} kWh
-            </Text>
-          </View>
-          <View style={styles.txStat}>
-            <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{l.cost}</Text>
-            <Text style={[styles.txStatValue, { color: colors.text }]}>
-              {tx.totalCostCzk != null ? `${tx.totalCostCzk.toFixed(2)} CZK` : '—'}
-            </Text>
-          </View>
-          <View style={styles.txStat}>
-            <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>
-              {language === 'cz' ? 'Doba' : language === 'de' ? 'Dauer' : 'Duration'}
-            </Text>
-            <Text style={[styles.txStatValue, { color: colors.text }]}>
-              {formatDuration(getDurationMinutes(tx))}
-            </Text>
-          </View>
+          {isActive && tx.live?.powerKw != null ? (
+            <>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.power}</Text>
+                <Text style={[styles.txStatValue, { color: '#3B82F6' }]}>
+                  {tx.live.powerKw.toFixed(1)} kW
+                </Text>
+              </View>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.energy}</Text>
+                <Text style={[styles.txStatValue, { color: colors.text }]}>
+                  {tx.live.energyKwh != null ? tx.live.energyKwh.toFixed(2) : '0.00'} kWh
+                </Text>
+              </View>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>
+                  {t.history.duration}
+                </Text>
+                <Text style={[styles.txStatValue, { color: colors.text }]}>
+                  {formatDuration(getDurationMinutes(tx))}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.energy}</Text>
+                <Text style={[styles.txStatValue, { color: colors.text }]}>
+                  {formatEnergy(tx.energyKwh)} kWh
+                </Text>
+              </View>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.cost}</Text>
+                <Text style={[styles.txStatValue, { color: colors.text }]}>
+                  {tx.totalCostCzk != null ? `${tx.totalCostCzk.toFixed(2)} CZK` : '—'}
+                </Text>
+              </View>
+              <View style={styles.txStat}>
+                <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>
+                  {t.history.duration}
+                </Text>
+                <Text style={[styles.txStatValue, { color: colors.text }]}>
+                  {formatDuration(getDurationMinutes(tx))}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Receipt link for completed sessions */}
@@ -219,7 +200,7 @@ export default function HistoryScreen() {
           <View style={[styles.receiptLink, { borderTopColor: colors.border }]}>
             <Ionicons name="receipt-outline" size={14} color={Colors.brand.accentGreen} />
             <Text style={[styles.receiptLinkText, { color: Colors.brand.accentGreen }]}>
-              {l.viewReceipt}
+              {t.history.viewReceipt}
             </Text>
             <Ionicons name="chevron-forward" size={14} color={Colors.brand.accentGreen} />
           </View>
@@ -234,7 +215,7 @@ export default function HistoryScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{l.title}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t.history.title}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -245,8 +226,8 @@ export default function HistoryScreen() {
       ) : transactions.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Ionicons name="time-outline" size={48} color={colors.textMuted} />
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{l.noHistory}</Text>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{l.noHistoryDesc}</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t.history.noHistory}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t.history.noHistoryDesc}</Text>
         </View>
       ) : (
         <FlatList

@@ -70,6 +70,13 @@ export interface ChargingSession {
   meterValues: MeterValue[];
 }
 
+export interface LiveData {
+  powerKw: number | null;
+  energyKwh: number | null;
+  socPercent: number | null;
+  timestamp: string | null;
+}
+
 export interface UserTransaction {
   id: string;
   transactionId: number;
@@ -83,6 +90,7 @@ export interface UserTransaction {
   billingStatus: string;
   totalCostCzk: number | null;
   avgSpotPriceCzkKwh: number | null;
+  live?: LiveData | null;
 }
 
 // ─── API Functions ───────────────────────────────
