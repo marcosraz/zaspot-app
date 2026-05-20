@@ -5,11 +5,13 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { ChargingStation, fetchStations } from './stations';
+import { ChargingStation, fetchStations, fetchOcppStations } from './stations';
 
 const CACHE_KEY = '@zaspot_stations_cache';
+const OCPP_CACHE_KEY = '@zaspot_ocpp_stations_cache';
 const CACHE_TIMESTAMP_KEY = '@zaspot_stations_cache_timestamp';
 const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24 hours
+const OCPP_CACHE_MAX_AGE_MS = 2 * 60 * 1000; // 2 min (own stations need fresh online status)
 
 interface CacheData {
   stations: ChargingStation[];
@@ -128,6 +130,44 @@ export async function fetchStationsWithCache(): Promise<{
   }
 
   // No cache available
+  return { stations: [], isFromCache: false };
+}
+
+/**
+ * Fetch ZAspot's own OCPP stations with short-lived cache (2 min).
+ * The fresh-fetch is preferred because online/offline status changes fast.
+ */
+export async function fetchOcppStationsWithCache(): Promise<{
+  stations: ChargingStation[];
+  isFromCache: boolean;
+}> {
+  const online = await isOnline();
+
+  if (online) {
+    try {
+      const stations = await fetchOcppStations();
+      await AsyncStorage.setItem(
+        OCPP_CACHE_KEY,
+        JSON.stringify({ stations, timestamp: Date.now() })
+      );
+      return { stations, isFromCache: false };
+    } catch {
+      // fall through to cache
+    }
+  }
+
+  try {
+    const cached = await AsyncStorage.getItem(OCPP_CACHE_KEY);
+    if (cached) {
+      const data: CacheData = JSON.parse(cached);
+      if (Date.now() - data.timestamp <= OCPP_CACHE_MAX_AGE_MS * 30) {
+        // Allow stale cache up to 1h offline
+        return { stations: data.stations, isFromCache: true };
+      }
+    }
+  } catch {
+    // ignore
+  }
   return { stations: [], isFromCache: false };
 }
 

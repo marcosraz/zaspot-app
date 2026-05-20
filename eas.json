@@ -1,7 +1,8 @@
 {
   "cli": {
     "version": ">= 5.0.0",
-    "appVersionSource": "local"
+    "appVersionSource": "local",
+    "promptToConfigurePushNotifications": false
   },
   "build": {
     "development": {
@@ -10,13 +11,34 @@
     },
     "preview": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "distribution": "internal"
       },
-      "distribution": "internal"
+      "ios": {
+        "simulator": false,
+        "distribution": "store"
+      }
     },
-    "production": {}
+    "production": {
+      "ios": {
+        "autoIncrement": true
+      }
+    }
   },
   "submit": {
-    "production": {}
+    "preview": {
+      "ios": {
+        "appleId": "marek.heidinger@gmail.com",
+        "appleTeamId": "2DR983VXCS",
+        "ascAppId": "6770471470"
+      }
+    },
+    "production": {
+      "ios": {
+        "appleId": "marek.heidinger@gmail.com",
+        "appleTeamId": "2DR983VXCS",
+        "ascAppId": "6770471470"
+      }
+    }
   }
 }

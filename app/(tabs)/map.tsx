@@ -2,7 +2,7 @@
  * Map Screen - Charging stations map with clustering
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import ClusteredMapView from 'react-native-map-clustering';
-import { Marker, Region } from 'react-native-maps';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
@@ -27,23 +26,41 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { ChargingStation } from '../../lib/stations';
-import { fetchStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
+import { fetchStationsWithCache, fetchOcppStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
+import { fetchEmpStations } from '../../lib/v2Features';
 import FavoriteButton from '../../components/FavoriteButton';
-import CustomMarker from '../../components/CustomMarker';
-import ClusterMarker from '../../components/ClusterMarker';
+import { LiveStationPrice } from '../../components/LiveStationPrice';
+
+// Region type
+type Region = {
+  latitude: number;
+  longitude: number;
+  latitudeDelta: number;
+  longitudeDelta: number;
+};
 
 export default function MapScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { isFavorite } = useFavorites();
-  const mapRef = useRef<any>(null);
+  // Legacy ref slot (former native MapView). The WebView has its own ref.
+  const mapRef = useRef<unknown>(null);
+  void mapRef;
 
+  // Diagnostic: tells when the WebView Leaflet map has loaded
+  const [mapStatus, setMapStatus] = useState<'init' | 'ready' | 'loaded'>('init');
+  const webViewRef = useRef<WebView>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStation, setSelectedStation] = useState<ChargingStation | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(true);
   const [stations, setStations] = useState<ChargingStation[]>([]);
+  const [ocppStations, setOcppStations] = useState<ChargingStation[]>([]);
+  // Hubject roaming stations — loaded lazily when user toggles "Vše"
+  const [empStations, setEmpStations] = useState<ChargingStation[]>([]);
+  const [empLoading, setEmpLoading] = useState(false);
+  const [networkFilter, setNetworkFilter] = useState<'zaspot' | 'all'>('zaspot');
   const [isOffline, setIsOffline] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -72,8 +89,15 @@ export default function MapScreen() {
   const loadStations = async () => {
     setLoading(true);
     try {
-      const { stations: data, isFromCache, cacheAge } = await fetchStationsWithCache();
-      setStations(data);
+      // Load both ZAspot's own OCPP stations + public stations DB in parallel
+      const [ocppResult, publicResult] = await Promise.all([
+        fetchOcppStationsWithCache(),
+        fetchStationsWithCache(),
+      ]);
+
+      setOcppStations(ocppResult.stations);
+      setStations(publicResult.stations);
+      const { isFromCache, cacheAge } = publicResult;
       setIsOffline(isFromCache);
 
       if (isFromCache && cacheAge) {
@@ -96,6 +120,41 @@ export default function MapScreen() {
     }
   };
 
+  // Load Hubject roaming stations only once when the user switches to 'Vše'
+  useEffect(() => {
+    if (networkFilter !== 'all' || empStations.length > 0 || empLoading) return;
+    setEmpLoading(true);
+    fetchEmpStations({ lat: 49.8175, lng: 15.4730, radius_km: 600 })
+      .then((res) => {
+        if (res.ok && res.data?.success) {
+          const mapped: ChargingStation[] = res.data.stations.map((s) => ({
+            id: 'emp-' + s.evse_id,
+            name: s.name,
+            address: s.address,
+            city: null,
+            postal_code: null,
+            country: 'EU',
+            latitude: s.latitude,
+            longitude: s.longitude,
+            type: s.max_power_kw >= 50 ? 'DC' : 'AC',
+            power_kw: s.max_power_kw,
+            price_per_kwh: s.price_per_kwh,
+            available: s.status === 'available',
+            status: s.status === 'available' ? 'operational' : 'offline',
+            operator: s.operator,
+            operator_phone: null,
+            connector_types: s.connectors.map((c) => c.type),
+            num_connectors: s.connectors.length,
+            access_hours: '24/7',
+            parking_fee: false,
+            description: null,
+          }));
+          setEmpStations(mapped);
+        }
+      })
+      .finally(() => setEmpLoading(false));
+  }, [networkFilter]);
+
   const getMarkerColor = (station: ChargingStation) => {
     if (station.status !== 'operational') return Colors.marker.offline;
     if (!station.available) return Colors.marker.occupied;
@@ -116,14 +175,27 @@ export default function MapScreen() {
     minPower: 0,
   });
 
+  // Combine stations based on network filter
+  // 'zaspot' = only ZAspot-owned OCPP stations (default)
+  // 'all'    = ZAspot + Hubject roaming + public DB, dedup by id
+  const allStations = React.useMemo(() => {
+    if (networkFilter === 'zaspot') return ocppStations;
+    const seen = new Set(ocppStations.map((s) => s.id));
+    // EMP roaming stations first (these are what user actually charges with through ZAspot wallet)
+    const empOnly = empStations.filter((s) => !seen.has(s.id));
+    empOnly.forEach((s) => seen.add(s.id));
+    const publicOnly = stations.filter((s) => !seen.has(s.id));
+    return [...ocppStations, ...empOnly, ...publicOnly];
+  }, [networkFilter, ocppStations, empStations, stations]);
+
   // Collect all unique connector types from stations for the filter UI
   const availableConnectorTypes = React.useMemo(() => {
     const types = new Set<string>();
-    stations.forEach(s => s.connector_types?.forEach(c => types.add(c)));
+    allStations.forEach(s => s.connector_types?.forEach(c => types.add(c)));
     return Array.from(types).sort();
-  }, [stations]);
+  }, [allStations]);
 
-  const filteredStations = stations.filter(station => {
+  const filteredStations = allStations.filter(station => {
     if (filters.dcOnly && station.type !== 'DC') return false;
     if (filters.acOnly && station.type !== 'AC') return false;
     if (filters.availableOnly && !station.available) return false;
@@ -143,13 +215,9 @@ export default function MapScreen() {
   });
 
   const centerOnLocation = () => {
-    if (location && mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
+    if (location && webViewRef.current) {
+      const js = `map.setView([${location.coords.latitude}, ${location.coords.longitude}], 14); true;`;
+      webViewRef.current.injectJavaScript(js);
     }
   };
 
@@ -161,82 +229,145 @@ export default function MapScreen() {
     if (url) Linking.openURL(url);
   };
 
-  // Dark mode map style - lighter version that works better
-  const darkMapStyle = [
-    { elementType: 'geometry', stylers: [{ color: '#242f3e' }] },
-    { elementType: 'labels.text.stroke', stylers: [{ color: '#242f3e' }] },
-    { elementType: 'labels.text.fill', stylers: [{ color: '#746855' }] },
-    { featureType: 'administrative.locality', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-    { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-    { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#263c3f' }] },
-    { featureType: 'poi.park', elementType: 'labels.text.fill', stylers: [{ color: '#6b9a76' }] },
-    { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#38414e' }] },
-    { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#212a37' }] },
-    { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#746855' }] },
-    { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#1f2835' }] },
-    { featureType: 'road.highway', elementType: 'labels.text.fill', stylers: [{ color: '#f3d19c' }] },
-    { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#2f3948' }] },
-    { featureType: 'transit.station', elementType: 'labels.text.fill', stylers: [{ color: '#d59563' }] },
-    { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
-    { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#515c6d' }] },
-  ];
+  // Push user location into WebView whenever it's available
+  useEffect(() => {
+    if (mapStatus !== 'loaded' || !webViewRef.current || !location) return;
+    const js = `window.updateUserLocation && window.updateUserLocation(${location.coords.latitude}, ${location.coords.longitude}); true;`;
+    webViewRef.current.injectJavaScript(js);
+  }, [location, mapStatus]);
+
+  // Push markers into the WebView whenever filtered stations change.
+  // Runs after map.ready (post-message from Leaflet init) so updateMarkers exists.
+  useEffect(() => {
+    if (mapStatus !== 'loaded' || !webViewRef.current) return;
+    const stationsJson = JSON.stringify(
+      filteredStations.map((s) => ({
+        id: s.id,
+        lat: Number(s.latitude),
+        lng: Number(s.longitude),
+        name: s.name,
+        isOcpp: s.is_ocpp === true,
+        isEmp: typeof s.id === 'string' && s.id.startsWith('emp-'),
+        available: s.available === true,
+      }))
+    );
+    const js = `window.updateMarkers && window.updateMarkers(${stationsJson}); true;`;
+    webViewRef.current.injectJavaScript(js);
+  }, [filteredStations, mapStatus]);
+
+  // CRITICAL: this HTML is computed ONCE per mount. We do NOT include region/isDark
+  // in deps — otherwise every pan/zoom invalidates the source and reloads the WebView.
+  const initialCenter = useRef({ lat: 49.8175, lng: 15.4730 });
+  const leafletHtml = useMemo(
+    () => `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+<style>
+  html,body,#map{margin:0;padding:0;height:100%;width:100%;background:#f3f4f6;}
+  .pin{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 4px rgba(0,0,0,.3);}
+  .pin svg{width:15px;height:15px;}
+  .user-dot{width:18px;height:18px;background:#3B82F6;border:3px solid #fff;border-radius:50%;box-shadow:0 0 0 4px rgba(59,130,246,.25);animation:pulse 2s infinite;}
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 4px rgba(59,130,246,.4); }
+    70% { box-shadow: 0 0 0 14px rgba(59,130,246,0); }
+    100% { box-shadow: 0 0 0 4px rgba(59,130,246,0); }
+  }
+  .marker-cluster-small div { background-color: rgba(22,163,74,.85) !important; color: #fff !important; }
+  .marker-cluster-medium div { background-color: rgba(22,163,74,.95) !important; color: #fff !important; }
+  .marker-cluster-large div { background-color: rgba(20,83,45,1) !important; color: #fff !important; }
+  .marker-cluster { background-color: rgba(22,163,74,.3) !important; }
+</style></head>
+<body>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+  const map = L.map('map', { zoomControl: false }).setView([${initialCenter.current.lat}, ${initialCenter.current.lng}], 7);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap',
+  }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+  // Marker clustering (auto-groups markers within zoom-dependent radius)
+  const markerCluster = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    spiderfyOnMaxZoom: true,
+    disableClusteringAtZoom: 14,
+    maxClusterRadius: 50,
+  });
+  map.addLayer(markerCluster);
+
+  // User location pin (pulsing blue dot)
+  let userMarker = null;
+  window.updateUserLocation = function(lat, lng) {
+    if (userMarker) { map.removeLayer(userMarker); }
+    userMarker = L.marker([lat, lng], {
+      icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
+      zIndexOffset: 1000,
+      interactive: false,
+    }).addTo(map);
+  };
+
+  window.updateMarkers = function(stations) {
+    markerCluster.clearLayers();
+    const markers = stations.map(function(s) {
+      const color = s.isOcpp ? '#16A34A' : (s.isEmp ? '#06B6D4' : (s.available ? '#3B82F6' : '#9CA3AF'));
+      const icon = L.divIcon({
+        className: '',
+        iconSize: [28, 28],
+        iconAnchor: [14, 14],
+        html: '<div class="pin" style="background:' + color + ';"><svg viewBox="0 0 24 24" fill="#fff" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L3 14h7v8l10-12h-7V2z"/></svg></div>'
+      });
+      const m = L.marker([s.lat, s.lng], { icon: icon });
+      m.on('click', function() {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'marker', id: s.id }));
+      });
+      return m;
+    });
+    markerCluster.addLayers(markers);
+  };
+  window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+</script>
+</body></html>`,
+    [] // empty deps: HTML is built ONCE
+  );
+
+  const onWebViewMessage = (event: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === 'ready') setMapStatus('loaded');
+      else if (msg.type === 'marker' && msg.id) {
+        const found = filteredStations.find((s) => s.id === msg.id);
+        if (found) setSelectedStation(found);
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <View style={styles.container}>
-      {/* Map with clustering */}
-      <ClusteredMapView
-        ref={mapRef}
+      {/* Leaflet map inside WebView — works reliably with New Architecture
+          and needs no Google Maps SDK. Tiles come from OpenStreetMap (free).
+          NOTE: onLoadStart deliberately doesn't reset mapStatus — only the initial
+          'ready' postMessage from Leaflet flips it to 'loaded'. */}
+      <WebView
+        ref={webViewRef}
         style={styles.map}
-        initialRegion={region}
-        showsUserLocation
-        showsMyLocationButton={false}
-        mapPadding={{ top: 100, right: 0, bottom: 250, left: 0 }}
-        customMapStyle={isDark ? darkMapStyle : undefined}
-        clusterColor={Colors.brand.accentGreen}
-        clusterTextColor="#FFFFFF"
-        clusterFontFamily="System"
-        radius={60}
-        minZoom={1}
-        maxZoom={16}
-        extent={512}
-        animationEnabled={false}
-        renderCluster={(cluster) => {
-          const { id, geometry, onPress, properties } = cluster;
-          const count = properties.point_count;
-          return (
-            <Marker
-              key={`cluster-${id}`}
-              coordinate={{
-                latitude: geometry.coordinates[1],
-                longitude: geometry.coordinates[0],
-              }}
-              onPress={onPress}
-              tracksViewChanges={false}
-            >
-              <ClusterMarker count={count} />
-            </Marker>
-          );
-        }}
-        onRegionChangeComplete={(newRegion: Region) => setRegion(newRegion)}
-      >
-        {filteredStations.map(station => (
-          <Marker
-            key={station.id}
-            coordinate={{
-              latitude: Number(station.latitude),
-              longitude: Number(station.longitude),
-            }}
-            onPress={() => setSelectedStation(station)}
-            tracksViewChanges={false}
-          >
-            <CustomMarker
-              station={station}
-              isSelected={selectedStation?.id === station.id}
-              isFavorite={isFavorite(station.id)}
-            />
-          </Marker>
-        ))}
-      </ClusteredMapView>
+        source={{ html: leafletHtml }}
+        originWhitelist={['*']}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        cacheEnabled={true}
+        onMessage={onWebViewMessage}
+        scrollEnabled={false}
+        bounces={false}
+        allowsBackForwardNavigationGestures={false}
+        androidLayerType="hardware"
+      />
 
       {/* Loading Indicator */}
       {loading && (
@@ -274,6 +405,42 @@ export default function MapScreen() {
         </TouchableOpacity>
       </SafeAreaView>
 
+      {/* Network Filter Toggle (matches web charging-map) */}
+      <View style={[styles.networkToggle, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity
+          style={[
+            styles.networkToggleBtn,
+            networkFilter === 'zaspot' && { backgroundColor: Colors.brand.accentGreen },
+          ]}
+          onPress={() => setNetworkFilter('zaspot')}
+        >
+          <Text
+            style={[
+              styles.networkToggleText,
+              { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
+            ]}
+          >
+            ZAspot ({ocppStations.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.networkToggleBtn,
+            networkFilter === 'all' && { backgroundColor: Colors.brand.accentGreen },
+          ]}
+          onPress={() => setNetworkFilter('all')}
+        >
+          <Text
+            style={[
+              styles.networkToggleText,
+              { color: networkFilter === 'all' ? '#fff' : colors.text },
+            ]}
+          >
+            Vše
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Station Count Badge */}
       <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
         <Ionicons name="location" size={16} color={Colors.brand.accentGreen} />
@@ -287,6 +454,30 @@ export default function MapScreen() {
         <View style={[styles.offlineBadge, { backgroundColor: '#F59E0B' }]}>
           <Ionicons name="cloud-offline" size={14} color="#FFFFFF" />
           <Text style={styles.offlineText}>{cacheInfo}</Text>
+        </View>
+      )}
+
+      {/* Loading indicator: map init OR EMP roaming stations being fetched */}
+      {(mapStatus !== 'loaded' || empLoading) && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 165,
+            alignSelf: 'center',
+            backgroundColor: '#FFFFFFE0',
+            paddingHorizontal: 14,
+            paddingVertical: 8,
+            borderRadius: 20,
+            elevation: 4,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
+          <ActivityIndicator size="small" color={Colors.brand.accentGreen} />
+          <Text style={{ color: '#1A1A1A', fontSize: 12, fontWeight: '600' }}>
+            {mapStatus !== 'loaded' ? 'Načítání mapy...' : 'Načítání roamingových stanic...'}
+          </Text>
         </View>
       )}
 
@@ -374,9 +565,13 @@ export default function MapScreen() {
 
             <View style={[styles.statBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F9FAFB' }]}>
               <Ionicons name="pricetag" size={20} color="#F59E0B" />
-              <Text style={[styles.statBoxValue, { color: colors.text }]}>
-                {selectedStation.price_per_kwh?.toFixed(2) || '—'}
-              </Text>
+              <LiveStationPrice
+                chargePointId={selectedStation.external_id}
+                isDc={selectedStation.type === 'DC'}
+                fallbackPriceCzkKwh={selectedStation.price_per_kwh}
+                textColor={colors.text}
+                labelColor={colors.textMuted}
+              />
               <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Kč/kWh</Text>
             </View>
 
@@ -685,10 +880,33 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
+  networkToggle: {
+    position: 'absolute',
+    top: 110,
+    left: 16,
+    flexDirection: 'row',
+    borderRadius: 20,
+    padding: 3,
+    gap: 2,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+  },
+  networkToggleBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+  },
+  networkToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
   countBadge: {
     position: 'absolute',
     top: 115,
-    alignSelf: 'center',
+    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,

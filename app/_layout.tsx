@@ -17,6 +17,7 @@ import { CreditProvider } from '../context/CreditContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
 import { VehicleProvider } from '../context/VehicleContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
+import { ShopProvider } from '../context/ShopContext';
 import AnimatedSplash from '../components/AnimatedSplash';
 
 // Keep the native splash screen visible while we load resources
@@ -62,6 +63,19 @@ function RootLayoutNav() {
             animation: 'slide_from_right',
           }}
         />
+
+        {/* v2.0 screens */}
+        <Stack.Screen name="shop/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="shop/[slug]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="shop/checkout" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="community/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="cards/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="rfid-tags/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="achievements/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="price-alerts/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="top-up/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="emp-stations/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="station-reviews/[chargePointId]" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>
   );
@@ -124,7 +138,9 @@ export default function RootLayout() {
                 <FavoritesProvider>
                 <VehicleProvider>
                   <NotificationsProvider>
-                    <AppContent />
+                    <ShopProvider>
+                      <AppContent />
+                    </ShopProvider>
                   </NotificationsProvider>
                 </VehicleProvider>
               </FavoritesProvider>
