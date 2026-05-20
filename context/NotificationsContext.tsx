@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { apiFetch } from '../lib/api';
+import { useLanguage } from './LanguageContext';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -82,6 +83,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   const [isLoaded, setIsLoaded] = useState(false);
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
+  const { t } = useLanguage();
 
   // Load settings on mount
   useEffect(() => {
@@ -277,10 +279,11 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         : currentPrice >= alert.thresholdKwh;
 
       if (shouldNotify) {
+        const n = t.notifications;
         await Notifications.scheduleNotificationAsync({
           content: {
-            title: alert.notifyBelow ? 'Nízká cena elektřiny!' : 'Vysoká cena elektřiny!',
-            body: `Aktuální cena ${currentPrice.toFixed(2)} Kč/kWh je ${alert.notifyBelow ? 'pod' : 'nad'} ${alert.thresholdKwh.toFixed(2)} Kč/kWh. ${alert.notifyBelow ? 'Ideální čas na nabíjení!' : 'Zvažte odložení nabíjení.'}`,
+            title: alert.notifyBelow ? n.lowPriceTitle : n.highPriceTitle,
+            body: `${n.currentPrice} ${currentPrice.toFixed(2)} Kč/kWh ${alert.notifyBelow ? n.below : n.above} ${alert.thresholdKwh.toFixed(2)} Kč/kWh. ${alert.notifyBelow ? n.idealChargingTime : n.considerDelaying}`,
             data: { price: currentPrice, alertId: alert.id },
           },
           trigger: null, // Immediate
@@ -300,8 +303,8 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'ZAspot Test',
-        body: 'Push notifikace fungují správně! Budete informováni o nízkých cenách elektřiny.',
+        title: t.notifications.testTitle,
+        body: t.notifications.testBody,
         data: { test: true },
       },
       trigger: null,
@@ -326,8 +329,10 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Rezervace začíná brzy',
-        body: `Vaše rezervace na ${stationName} začíná za ${RESERVATION_REMINDER_MINUTES} minut.`,
+        title: t.notifications.reservationSoonTitle,
+        body: t.notifications.reservationStartsIn
+          .replace('{station}', stationName)
+          .replace('{minutes}', String(RESERVATION_REMINDER_MINUTES)),
         data: { type: 'reservation_reminder', reservationId },
         ...(Platform.OS === 'android' && { channelId: 'reservations' }),
       },
@@ -351,8 +356,8 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Nabíjení zahájeno',
-        body: `Nabíjení na ${stationName} bylo úspěšně zahájeno.`,
+        title: t.notifications.chargingStartedTitle,
+        body: t.notifications.chargingStartedAt.replace('{station}', stationName),
         data: { type: 'charging_started' },
         ...(Platform.OS === 'android' && { channelId: 'charging' }),
       },
@@ -373,7 +378,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
     const costText = costCzk != null ? ` • ${costCzk.toFixed(2)} CZK` : '';
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'Nabíjení dokončeno',
+        title: t.notifications.chargingCompleteTitle,
         body: `${stationName}: ${energyKwh.toFixed(2)} kWh${costText}`,
         data: { type: 'charging_complete' },
         ...(Platform.OS === 'android' && { channelId: 'charging' }),

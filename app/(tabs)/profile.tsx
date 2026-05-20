@@ -136,21 +136,18 @@ export default function ProfileScreen() {
       setVehicleDescription('');
       loadAutoCharge();
     } else {
-      Alert.alert('Error', result.error || 'Registration failed');
+      Alert.alert(t.common.error, result.error || t.common.error);
     }
   };
 
   const handleDeleteVehicle = (vehicle: RegisteredVehicle) => {
-    const confirmText = language === 'cz' ? 'Opravdu chcete odebrat toto vozidlo?' :
-                        language === 'de' ? 'Möchten Sie dieses Fahrzeug wirklich entfernen?' :
-                        'Do you want to remove this vehicle?';
     Alert.alert(
-      language === 'cz' ? 'Odebrat vozidlo' : language === 'de' ? 'Fahrzeug entfernen' : 'Remove Vehicle',
-      confirmText,
+      t.profile.removeVehicle,
+      t.profile.removeVehicleConfirm,
       [
-        { text: language === 'cz' ? 'Ne' : language === 'de' ? 'Nein' : 'No', style: 'cancel' },
+        { text: t.profile.no, style: 'cancel' },
         {
-          text: language === 'cz' ? 'Ano' : language === 'de' ? 'Ja' : 'Yes',
+          text: t.profile.yes,
           style: 'destructive',
           onPress: async () => {
             const result = await deleteVehicle(vehicle.id);
@@ -174,7 +171,7 @@ export default function ProfileScreen() {
       setManualMacName('');
       loadAutoCharge();
     } else {
-      Alert.alert('Error', result.error || 'Registration failed');
+      Alert.alert(t.common.error, result.error || t.common.error);
     }
   };
 
@@ -189,7 +186,7 @@ export default function ProfileScreen() {
       setRfidName('');
       loadAutoCharge();
     } else {
-      Alert.alert('Error', result.error || 'Registration failed');
+      Alert.alert(t.common.error, result.error || t.common.error);
     }
   };
 
@@ -197,7 +194,7 @@ export default function ProfileScreen() {
     if (settings.selectedVehicle) {
       return `${settings.selectedVehicle.manufacturer} ${settings.selectedVehicle.name}`;
     }
-    return 'Vybrat vozidlo';
+    return t.profile.selectVehicle;
   };
 
   // Group vehicles by manufacturer
@@ -267,14 +264,10 @@ export default function ProfileScreen() {
               <Ionicons name="person-circle-outline" size={36} color="#FFFFFF" />
               <View style={styles.loginCardText}>
                 <Text style={styles.loginCardTitle}>
-                  {language === 'cz' ? 'Přihlaste se' :
-                   language === 'de' ? 'Melden Sie sich an' :
-                   language === 'pl' ? 'Zaloguj się' : 'Sign in'}
+                  {t.profile.signIn}
                 </Text>
                 <Text style={styles.loginCardSubtitle}>
-                  {language === 'cz' ? 'Pro nabíjení a platby' :
-                   language === 'de' ? 'Zum Laden und Bezahlen' :
-                   language === 'pl' ? 'Do ładowania i płatności' : 'For charging and payments'}
+                  {t.profile.signInSubtitle}
                 </Text>
               </View>
             </View>
@@ -287,9 +280,7 @@ export default function ProfileScreen() {
           <View style={[styles.creditCard, { backgroundColor: colors.surface }]}>
             <View style={styles.creditInfo}>
               <Text style={[styles.creditLabel, { color: colors.textSecondary }]}>
-                {language === 'cz' ? 'Kredit' :
-                 language === 'de' ? 'Guthaben' :
-                 language === 'pl' ? 'Saldo' : 'Credit'}
+                {t.profile.credit}
               </Text>
               <Text style={[styles.creditAmount, { color: colors.text }]}>
                 {creditLoading ? '...' : balanceFormatted}
@@ -302,9 +293,7 @@ export default function ProfileScreen() {
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
               <Text style={styles.topUpBtnText}>
-                {language === 'cz' ? 'Dobít' :
-                 language === 'de' ? 'Aufladen' :
-                 language === 'pl' ? 'Doładuj' : 'Top Up'}
+                {t.profile.topUp}
               </Text>
             </TouchableOpacity>
           </View>
@@ -377,7 +366,7 @@ export default function ProfileScreen() {
             <MenuItem
               icon="notifications"
               label={t.profile.notifications}
-              value={hasPermission ? 'Zapnuto' : 'Vypnuto'}
+              value={hasPermission ? t.profile.notificationsOn : t.profile.notificationsOff}
               onPress={async () => {
                 if (!hasPermission) {
                   await requestPermission();
@@ -396,7 +385,7 @@ export default function ProfileScreen() {
                     onPress={requestPermission}
                   >
                     <Ionicons name="notifications" size={20} color="#FFFFFF" />
-                    <Text style={styles.enableNotificationsBtnText}>Povolit notifikace</Text>
+                    <Text style={styles.enableNotificationsBtnText}>{t.profile.enableNotifications}</Text>
                   </TouchableOpacity>
                 )}
 
@@ -405,7 +394,7 @@ export default function ProfileScreen() {
                   <View key={alert.id} style={styles.priceAlertItem}>
                     <View style={styles.priceAlertInfo}>
                       <Text style={[styles.priceAlertLabel, { color: colors.text }]}>
-                        {alert.notifyBelow ? 'Upozornit pod' : 'Upozornit nad'}
+                        {alert.notifyBelow ? t.profile.notifyBelow : t.profile.notifyAbove}
                       </Text>
                       <View style={styles.priceAlertValue}>
                         <TouchableOpacity
@@ -446,7 +435,7 @@ export default function ProfileScreen() {
                   >
                     <Ionicons name="notifications-outline" size={18} color={colors.textSecondary} />
                     <Text style={[styles.testNotificationText, { color: colors.textSecondary }]}>
-                      Odeslat testovací notifikaci
+                      {t.profile.sendTestNotification}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -458,12 +447,12 @@ export default function ProfileScreen() {
         {/* Vehicle Section */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            ELEKTROMOBIL
+            {t.profile.vehicleSectionTitle}
           </Text>
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
             <MenuItem
               icon="car-sport"
-              label="Moje vozidlo"
+              label={t.profile.myVehicle}
               value={getCurrentVehicleName()}
               onPress={() => setShowVehicleSelector(!showVehicleSelector)}
               iconColor="#3B82F6"
@@ -520,21 +509,21 @@ export default function ProfileScreen() {
                     <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
                       {settings.selectedVehicle.batteryCapacityKwh} kWh
                     </Text>
-                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Baterie</Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>{t.profile.battery}</Text>
                   </View>
                   <View style={styles.vehicleStat}>
                     <Ionicons name="speedometer" size={20} color="#3B82F6" />
                     <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
                       {settings.selectedVehicle.rangeKm} km
                     </Text>
-                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Dojezd</Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>{t.profile.range}</Text>
                   </View>
                   <View style={styles.vehicleStat}>
                     <Ionicons name="flash" size={20} color="#F59E0B" />
                     <Text style={[styles.vehicleStatValue, { color: colors.text }]}>
                       {settings.selectedVehicle.maxChargingPowerKw} kW
                     </Text>
-                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>Max nabíjení</Text>
+                    <Text style={[styles.vehicleStatLabel, { color: colors.textMuted }]}>{t.profile.maxCharging}</Text>
                   </View>
                 </View>
               </>
@@ -553,7 +542,7 @@ export default function ProfileScreen() {
                 icon="car-sport"
                 label="AutoCharge"
                 value={registeredVehicles.length > 0
-                  ? `${registeredVehicles.length} ${language === 'cz' ? 'vozidel' : language === 'de' ? 'Fahrzeuge' : 'vehicles'}`
+                  ? `${registeredVehicles.length} ${t.profile.autoChargeVehicleCount}`
                   : undefined
                 }
                 onPress={() => setShowAutoCharge(!showAutoCharge)}
@@ -594,8 +583,7 @@ export default function ProfileScreen() {
                             <Ionicons name="help-circle" size={20} color="#F59E0B" />
                             <View style={{ flex: 1 }}>
                               <Text style={[styles.autoChargeTag, { color: colors.text }]}>
-                                {language === 'cz' ? 'Nové vozidlo' :
-                                 language === 'de' ? 'Neues Fahrzeug' : 'New vehicle'}
+                                {t.profile.newVehicle}
                               </Text>
                               <Text style={[styles.autoChargeMeta, { color: colors.textMuted }]}>
                                 {v.id_tag}
@@ -607,8 +595,7 @@ export default function ProfileScreen() {
                                 style={[styles.registerBtn, { backgroundColor: Colors.brand.accentGreen }]}
                               >
                                 <Text style={styles.registerBtnText}>
-                                  {language === 'cz' ? 'Přidat' :
-                                   language === 'de' ? 'Hinzufügen' : 'Add'}
+                                  {t.profile.addVehicle}
                                 </Text>
                               </TouchableOpacity>
                             )}
@@ -620,8 +607,7 @@ export default function ProfileScreen() {
                                 style={[styles.registerInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                                 value={vehicleDescription}
                                 onChangeText={setVehicleDescription}
-                                placeholder={language === 'cz' ? 'Název vozidla (např. Můj Enyaq)' :
-                                            language === 'de' ? 'Fahrzeugname (z.B. Mein Enyaq)' : 'Vehicle name (e.g. My Enyaq)'}
+                                placeholder={t.profile.vehicleNamePlaceholder}
                                 placeholderTextColor={colors.textMuted}
                               />
                               <View style={styles.registerActions}>
@@ -649,9 +635,7 @@ export default function ProfileScreen() {
 
                       {registeredVehicles.length === 0 && pendingVehicles.length === 0 && (
                         <Text style={[styles.autoChargeEmpty, { color: colors.textMuted }]}>
-                          {language === 'cz' ? 'Připojte EV k naší stanici - vozidlo se automaticky rozpozná.' :
-                           language === 'de' ? 'Schließen Sie Ihr EV an unsere Station an - es wird automatisch erkannt.' :
-                           'Plug your EV into our station - it will be auto-detected.'}
+                          {t.profile.autoChargeEmpty}
                         </Text>
                       )}
 
@@ -662,9 +646,7 @@ export default function ProfileScreen() {
                       >
                         <Ionicons name="add-circle-outline" size={18} color={Colors.brand.accentGreen} />
                         <Text style={[styles.addManualBtnText, { color: Colors.brand.accentGreen }]}>
-                          {language === 'cz' ? 'Zadat MAC adresu ručně' :
-                           language === 'de' ? 'MAC-Adresse manuell eingeben' :
-                           'Enter MAC address manually'}
+                          {t.profile.enterMacManually}
                         </Text>
                       </TouchableOpacity>
 
@@ -682,14 +664,11 @@ export default function ProfileScreen() {
                             style={[styles.registerInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                             value={manualMacName}
                             onChangeText={setManualMacName}
-                            placeholder={language === 'cz' ? 'Název vozidla' :
-                                        language === 'de' ? 'Fahrzeugname' : 'Vehicle name'}
+                            placeholder={t.profile.vehicleName}
                             placeholderTextColor={colors.textMuted}
                           />
                           <Text style={[styles.macHint, { color: colors.textMuted }]}>
-                            {language === 'cz' ? 'Tesla: Ovládání → Software → Další info o vozidle\nVW ID: Infotainment → Nastavení → O vozidle' :
-                             language === 'de' ? 'Tesla: Steuerung → Software → Zusätzliche Fahrzeuginfo\nVW ID: Infotainment → Einstellungen → Über das Fahrzeug' :
-                             'Tesla: Controls → Software → Additional Vehicle Info\nVW ID: Infotainment → Settings → About the vehicle'}
+                            {`${t.profile.macHintTesla}\n${t.profile.macHintVw}`}
                           </Text>
                           <View style={styles.registerActions}>
                             <TouchableOpacity
@@ -718,8 +697,7 @@ export default function ProfileScreen() {
                       {/* RFID Cards Section */}
                       <View style={[styles.rfidDivider, { borderTopColor: colors.border }]}>
                         <Text style={[styles.rfidSectionTitle, { color: colors.textSecondary }]}>
-                          {language === 'cz' ? 'RFID karty' :
-                           language === 'de' ? 'RFID-Karten' : 'RFID Cards'}
+                          {t.profile.rfidCards}
                         </Text>
                       </View>
 
@@ -743,8 +721,7 @@ export default function ProfileScreen() {
                       >
                         <Ionicons name="add-circle-outline" size={18} color="#3B82F6" />
                         <Text style={[styles.addManualBtnText, { color: '#3B82F6' }]}>
-                          {language === 'cz' ? 'Přidat RFID kartu' :
-                           language === 'de' ? 'RFID-Karte hinzufügen' : 'Add RFID card'}
+                          {t.profile.addRfidCard}
                         </Text>
                       </TouchableOpacity>
 
@@ -754,8 +731,7 @@ export default function ProfileScreen() {
                             style={[styles.registerInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                             value={rfidTag}
                             onChangeText={setRfidTag}
-                            placeholder={language === 'cz' ? 'Číslo RFID karty' :
-                                        language === 'de' ? 'RFID-Kartennummer' : 'RFID card number'}
+                            placeholder={t.profile.rfidCardNumber}
                             placeholderTextColor={colors.textMuted}
                             autoCapitalize="characters"
                           />
@@ -763,8 +739,7 @@ export default function ProfileScreen() {
                             style={[styles.registerInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                             value={rfidName}
                             onChangeText={setRfidName}
-                            placeholder={language === 'cz' ? 'Název karty' :
-                                        language === 'de' ? 'Kartenname' : 'Card name'}
+                            placeholder={t.profile.cardName}
                             placeholderTextColor={colors.textMuted}
                           />
                           <View style={styles.registerActions}>
@@ -820,9 +795,70 @@ export default function ProfileScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="notifications-circle"
-              label={t.profile.priceAlerts}
-              onPress={() => setShowPriceAlertEditor(!showPriceAlertEditor)}
+              label="Cenové alerty"
+              onPress={() => router.push('/price-alerts')}
               iconColor="#EF4444"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="trophy"
+              label="Úspěchy"
+              onPress={() => router.push('/achievements')}
+              iconColor="#F59E0B"
+            />
+          </View>
+        </View>
+
+        {/* Wallet & Payments */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Peněženka & platby</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+            <MenuItem
+              icon="wallet"
+              label="Dobít kredit"
+              onPress={() => router.push('/top-up')}
+              iconColor="#16A34A"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="card"
+              label="Moje karty"
+              onPress={() => router.push('/cards')}
+              iconColor="#3B82F6"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="hardware-chip"
+              label="RFID karty"
+              onPress={() => router.push('/rfid-tags')}
+              iconColor="#8B5CF6"
+            />
+          </View>
+        </View>
+
+        {/* Discover */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Objevit</Text>
+          <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+            <MenuItem
+              icon="cart"
+              label="Obchod"
+              onPress={() => router.push('/shop')}
+              iconColor="#16A34A"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="leaf"
+              label="Komunitní energetika"
+              onPress={() => router.push('/community')}
+              iconColor="#10B981"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
+              icon="globe"
+              label="eRoaming (Hubject)"
+              onPress={() => router.push('/emp-stations')}
+              iconColor="#06B6D4"
             />
           </View>
         </View>

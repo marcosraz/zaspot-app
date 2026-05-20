@@ -22,6 +22,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Colors } from '../../../constants/colors';
 import { Layout } from '../../../constants/layout';
+import { getLocale } from '../../../constants/translations';
 import { apiFetch } from '../../../lib/api';
 import { formatDuration, formatEnergy } from '../../../lib/charging';
 
@@ -42,108 +43,13 @@ interface ReceiptData {
   isArchived: boolean;
 }
 
-const labels: Record<string, Record<string, string>> = {
-  cz: {
-    title: 'Účtenka',
-    loading: 'Načítání účtenky...',
-    error: 'Účtenka nenalezena',
-    station: 'Stanice',
-    connector: 'Konektor',
-    date: 'Datum',
-    startTime: 'Začátek',
-    endTime: 'Konec',
-    duration: 'Doba nabíjení',
-    energy: 'Energie',
-    avgPrice: 'Průměrná cena',
-    total: 'Celkem',
-    status: 'Stav',
-    completed: 'Dokončeno',
-    active: 'Aktivní',
-    share: 'Sdílet',
-    sendEmail: 'Odeslat na email',
-    emailSent: 'Email odeslán',
-    emailError: 'Chyba při odesílání emailu',
-    back: 'Zpět',
-    receiptNo: 'Účtenka č.',
-  },
-  en: {
-    title: 'Receipt',
-    loading: 'Loading receipt...',
-    error: 'Receipt not found',
-    station: 'Station',
-    connector: 'Connector',
-    date: 'Date',
-    startTime: 'Start',
-    endTime: 'End',
-    duration: 'Charging duration',
-    energy: 'Energy',
-    avgPrice: 'Average price',
-    total: 'Total',
-    status: 'Status',
-    completed: 'Completed',
-    active: 'Active',
-    share: 'Share',
-    sendEmail: 'Send to email',
-    emailSent: 'Email sent',
-    emailError: 'Error sending email',
-    back: 'Back',
-    receiptNo: 'Receipt #',
-  },
-  de: {
-    title: 'Beleg',
-    loading: 'Beleg wird geladen...',
-    error: 'Beleg nicht gefunden',
-    station: 'Station',
-    connector: 'Anschluss',
-    date: 'Datum',
-    startTime: 'Start',
-    endTime: 'Ende',
-    duration: 'Ladedauer',
-    energy: 'Energie',
-    avgPrice: 'Durchschnittspreis',
-    total: 'Gesamt',
-    status: 'Status',
-    completed: 'Abgeschlossen',
-    active: 'Aktiv',
-    share: 'Teilen',
-    sendEmail: 'Per E-Mail senden',
-    emailSent: 'E-Mail gesendet',
-    emailError: 'Fehler beim Senden',
-    back: 'Zurück',
-    receiptNo: 'Beleg Nr.',
-  },
-  pl: {
-    title: 'Rachunek',
-    loading: 'Ładowanie rachunku...',
-    error: 'Rachunek nie znaleziony',
-    station: 'Stacja',
-    connector: 'Złącze',
-    date: 'Data',
-    startTime: 'Początek',
-    endTime: 'Koniec',
-    duration: 'Czas ładowania',
-    energy: 'Energia',
-    avgPrice: 'Średnia cena',
-    total: 'Łącznie',
-    status: 'Status',
-    completed: 'Zakończone',
-    active: 'Aktywne',
-    share: 'Udostępnij',
-    sendEmail: 'Wyślij na email',
-    emailSent: 'Email wysłany',
-    emailError: 'Błąd wysyłania emailu',
-    back: 'Wstecz',
-    receiptNo: 'Rachunek nr.',
-  },
-};
-
 export default function ReceiptScreen() {
   const { transactionId } = useLocalSearchParams<{ transactionId: string }>();
   const { colors, isDark } = useTheme();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const { user } = useAuth();
 
-  const l = labels[language] || labels.en;
+  const l = t.receipt;
 
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,7 +69,7 @@ export default function ReceiptScreen() {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(language === 'cz' ? 'cs-CZ' : language === 'de' ? 'de-DE' : language === 'pl' ? 'pl-PL' : 'en-US', {
+    return d.toLocaleDateString(getLocale(language), {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
@@ -172,7 +78,7 @@ export default function ReceiptScreen() {
 
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleTimeString(language === 'cz' ? 'cs-CZ' : 'en-US', {
+    return d.toLocaleTimeString(getLocale(language), {
       hour: '2-digit',
       minute: '2-digit',
     });

@@ -5,7 +5,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 
-const API_BASE = 'https://zaspot.cz/api';
+const API_BASE = 'https://www.zaspot.cz/api';
 
 const TOKEN_KEY = 'zaspot_auth_token';
 const USER_KEY = 'zaspot_auth_user';
@@ -144,9 +144,25 @@ export async function apiFetch<T = any>(
   }
 }
 
-// ─── Token Refresh ───────────────────────────────
+// ─── Token Refresh (with mutex to prevent race conditions) ───
+
+let refreshPromise: Promise<boolean> | null = null;
 
 async function refreshToken(): Promise<boolean> {
+  // If a refresh is already in progress, wait for it instead of starting another
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  refreshPromise = doRefreshToken();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
+}
+
+async function doRefreshToken(): Promise<boolean> {
   try {
     const auth = await getStoredAuth();
     if (!auth) return false;

@@ -22,13 +22,13 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { getLocale } from '../../constants/translations';
 import { useNotifications } from '../../context/NotificationsContext';
 import { Reservation, fetchReservations, cancelReservation } from '../../lib/reservations';
 
 export default function ReservationsScreen() {
   const { colors } = useTheme();
-  const { language } = useLanguage();
-  const { t } = useLanguage();
+  const { language, t } = useLanguage();
   const { isAuthenticated } = useAuth();
   const { scheduleReservationReminder, cancelReservationReminder } = useNotifications();
 
@@ -66,9 +66,7 @@ export default function ReservationsScreen() {
   const handleCancel = (reservation: Reservation) => {
     Alert.alert(
       t.reservations.cancel,
-      language === 'cz' ? 'Opravdu chcete zrušit tuto rezervaci?' :
-      language === 'de' ? 'Möchten Sie diese Reservierung stornieren?' :
-      'Do you want to cancel this reservation?',
+      t.reservations.cancelConfirm,
       [
         { text: t.common.cancel, style: 'cancel' },
         {
@@ -112,7 +110,7 @@ export default function ReservationsScreen() {
 
   const formatDateTime = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString(language === 'cz' ? 'cs-CZ' : language === 'de' ? 'de-DE' : 'en-US', {
+    return d.toLocaleDateString(getLocale(language), {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
@@ -133,16 +131,14 @@ export default function ReservationsScreen() {
         <View style={styles.emptyContainer}>
           <Ionicons name="log-in-outline" size={48} color={colors.textMuted} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-            {language === 'cz' ? 'Pro zobrazení rezervací se přihlaste.' :
-             language === 'de' ? 'Melden Sie sich an, um Reservierungen zu sehen.' :
-             'Sign in to see your reservations.'}
+            {t.reservations.loginRequired}
           </Text>
           <TouchableOpacity
             onPress={() => router.push('/(auth)/login')}
             style={[styles.loginBtn, { backgroundColor: Colors.brand.accentGreen }]}
           >
             <Text style={styles.loginBtnText}>
-              {language === 'cz' ? 'Přihlásit se' : language === 'de' ? 'Anmelden' : 'Sign In'}
+              {t.reservations.signIn}
             </Text>
           </TouchableOpacity>
         </View>
@@ -174,7 +170,7 @@ export default function ReservationsScreen() {
 
         {res.deposit_czk > 0 && (
           <Text style={[styles.resDeposit, { color: colors.textMuted }]}>
-            {language === 'cz' ? 'Záloha' : language === 'de' ? 'Kaution' : 'Deposit'}: {res.deposit_czk} CZK
+            {t.reservations.deposit}: {res.deposit_czk} CZK
           </Text>
         )}
 

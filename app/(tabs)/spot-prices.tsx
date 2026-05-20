@@ -28,6 +28,7 @@ import {
   getPriceColor,
   DailyPrices,
 } from '../../lib/spotPrices';
+import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 
 type TimeRange = 'today' | 'week' | 'month';
 
@@ -45,10 +46,15 @@ export default function SpotPricesScreen() {
   const [dailyData, setDailyData] = useState<DailyPrices | null>(null);
   const [weeklyData, setWeeklyData] = useState<{ date: string; avgPrice: number }[]>([]);
   const [monthlyData, setMonthlyData] = useState<{ date: string; avgPrice: number }[]>([]);
+  // Aligned with web homepage: prominent "Current Price" comes from /api/current-spot-price
+  const [livePrice, setLivePrice] = useState<EffectivePrices | null>(null);
 
   const loadData = useCallback(async () => {
     setError(null);
     try {
+      // Live current price (matches web homepage)
+      fetchEffectivePrices().then((p) => p && setLivePrice(p));
+
       // Load today's data
       const today = await fetchSpotPrices();
       if (today) {
@@ -128,8 +134,11 @@ export default function SpotPricesScreen() {
     highestSlot: 0,
   };
 
+  // Override stats.current with live spot price from /api/current-spot-price
+  // (same source as web homepage — keeps the prominent number in sync)
+  const liveCurrent = livePrice?.spotPrice ?? stats.current;
   const displayStats = {
-    current: unit === 'kwh' ? stats.current : stats.current * 1000,
+    current: unit === 'kwh' ? liveCurrent : liveCurrent * 1000,
     average: unit === 'kwh' ? stats.average : stats.average * 1000,
     lowest: unit === 'kwh' ? stats.lowest : stats.lowest * 1000,
     highest: unit === 'kwh' ? stats.highest : stats.highest * 1000,

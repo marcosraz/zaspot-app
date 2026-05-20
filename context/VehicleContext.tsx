@@ -19,6 +19,10 @@ import {
 export type { VehiclePreset };
 export { POPULAR_VEHICLES };
 
+const VEHICLE_STORAGE_KEY = '@zaspot/vehicle_settings';
+
+const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
+
 export interface VehicleProfile {
   id: string;
   name: string;

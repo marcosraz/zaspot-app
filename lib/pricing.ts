@@ -3,24 +3,33 @@
  * Fetches spot price + platform fee + operator markups from zaspot.cz
  */
 
-const API_BASE = 'https://zaspot.cz/api';
+const API_BASE = 'https://www.zaspot.cz/api';
 
 export interface SpotPriceData {
-  price: number;           // Base spot price CZK/kWh
-  timeSlot: string;        // e.g. "14:00 - 14:15"
-  slot: number;            // 0-95
-  exchangeRate: number;    // EUR → CZK
-  platformFee: number;     // CZK/kWh
-  acMarkup: number;        // CZK/kWh
-  dcMarkup: number;        // CZK/kWh
+  price: number;                // Base spot price CZK/kWh
+  timeSlot: string;             // e.g. "14:00 - 14:15"
+  slot: number;                 // 0-95
+  exchangeRate: number;         // EUR → CZK
+  platformFee: number;          // CZK/kWh
+  distributionFee?: number;     // legacy fallback
+  acDistributionFee: number;    // CZK/kWh — D25d tariff
+  dcDistributionFee: number;    // CZK/kWh — C45d tariff
+  acDistributionLabel?: string;
+  dcDistributionLabel?: string;
+  acMarkup: number;             // CZK/kWh
+  dcMarkup: number;             // CZK/kWh
   timestamp: string;
 }
 
 export interface EffectivePrices {
   spotPrice: number;
   platformFee: number;
-  acPrice: number;         // (spotPrice + platformFee + acMarkup) * 1.21 (incl. VAT)
-  dcPrice: number;         // (spotPrice + platformFee + dcMarkup) * 1.21 (incl. VAT)
+  acDistributionFee: number;
+  dcDistributionFee: number;
+  // (spotPrice + acDistributionFee + acMarkup + platformFee) * 1.21 (incl. VAT)
+  acPrice: number;
+  // (spotPrice + dcDistributionFee + dcMarkup + platformFee) * 1.21 (incl. VAT)
+  dcPrice: number;
   acMarkup: number;
   dcMarkup: number;
   timeSlot: string;
@@ -48,13 +57,19 @@ export async function fetchEffectivePrices(): Promise<EffectivePrices | null> {
     const data: SpotPriceData = await res.json();
 
     const VAT = 1.21; // 21% Czech DPH
+    // Fallback: legacy responses without per-type distribution fees
+    const acDist = data.acDistributionFee ?? data.distributionFee ?? 0;
+    const dcDist = data.dcDistributionFee ?? data.distributionFee ?? 0;
     const prices: EffectivePrices = {
       spotPrice: data.price,
       platformFee: data.platformFee,
+      acDistributionFee: acDist,
+      dcDistributionFee: dcDist,
       acMarkup: data.acMarkup,
       dcMarkup: data.dcMarkup,
-      acPrice: (data.price + data.platformFee + data.acMarkup) * VAT,
-      dcPrice: (data.price + data.platformFee + data.dcMarkup) * VAT,
+      // Web formula: (spot + distrib + markup + platform) * VAT
+      acPrice: (data.price + acDist + data.acMarkup + data.platformFee) * VAT,
+      dcPrice: (data.price + dcDist + data.dcMarkup + data.platformFee) * VAT,
       timeSlot: data.timeSlot,
       timestamp: data.timestamp,
     };

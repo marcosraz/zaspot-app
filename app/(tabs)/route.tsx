@@ -59,7 +59,7 @@ export default function RouteScreen() {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Chyba', 'Přístup k poloze byl zamítnut');
+        Alert.alert(t.common.error, t.route.locationDenied);
         return;
       }
 
@@ -67,7 +67,7 @@ export default function RouteScreen() {
       const coords: RoutePoint = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
-        name: 'Moje poloha',
+        name: t.route.myLocation,
       };
 
       // Reverse geocode to get address
@@ -77,16 +77,16 @@ export default function RouteScreen() {
       });
 
       if (address) {
-        coords.name = address.city || address.subregion || 'Moje poloha';
+        coords.name = address.city || address.subregion || t.route.myLocation;
         setFromLocation(coords.name);
       } else {
-        setFromLocation('Moje poloha');
+        setFromLocation(t.route.myLocation);
       }
 
       setFromCoords(coords);
     } catch (err) {
       console.error('Location error:', err);
-      Alert.alert('Chyba', 'Nepodařilo se získat polohu');
+      Alert.alert(t.common.error, t.route.locationFailed);
     } finally {
       setIsLocating(false);
     }
@@ -122,7 +122,7 @@ export default function RouteScreen() {
     }
 
     if (!from || !to) {
-      setError('Zadejte platné adresy pro start a cíl');
+      setError(t.route.invalidAddresses);
       return;
     }
 
@@ -141,7 +141,7 @@ export default function RouteScreen() {
       setRouteResult(result);
     } catch (err) {
       console.error('Route planning error:', err);
-      setError('Nepodařilo se naplánovat trasu');
+      setError(t.route.planningFailed);
     } finally {
       setIsCalculating(false);
     }
@@ -295,7 +295,7 @@ export default function RouteScreen() {
             </View>
             {!activeVehicle && (
               <Text style={[styles.tapHint, { color: colors.textMuted }]}>
-                Klepněte pro změnu hodnot
+                {t.route.tapToChange}
               </Text>
             )}
           </View>
@@ -370,14 +370,14 @@ export default function RouteScreen() {
                 <View style={styles.durationItem}>
                   <Ionicons name="car" size={16} color={colors.textSecondary} />
                   <Text style={[styles.durationText, { color: colors.textSecondary }]}>
-                    Jízda: {formatDuration(routeResult.drivingDuration)}
+                    {t.route.driving}: {formatDuration(routeResult.drivingDuration)}
                   </Text>
                 </View>
                 {routeResult.chargingDuration > 0 && (
                   <View style={styles.durationItem}>
                     <Ionicons name="flash" size={16} color={Colors.brand.accentGreen} />
                     <Text style={[styles.durationText, { color: colors.textSecondary }]}>
-                      Nabíjení: {formatDuration(routeResult.chargingDuration)}
+                      {t.route.chargingTime}: {formatDuration(routeResult.chargingDuration)}
                     </Text>
                   </View>
                 )}
@@ -389,10 +389,10 @@ export default function RouteScreen() {
               <View style={[styles.noStopsCard, { backgroundColor: isDark ? colors.surfaceSecondary : '#ECFDF5' }]}>
                 <Ionicons name="checkmark-circle" size={32} color={Colors.brand.accentGreen} />
                 <Text style={[styles.noStopsTitle, { color: Colors.brand.accentGreen }]}>
-                  Žádné nabíjení není potřeba!
+                  {t.route.noChargingNeeded}
                 </Text>
                 <Text style={[styles.noStopsText, { color: colors.textSecondary }]}>
-                  S aktuální baterií dojede na cíl bez zastávky.
+                  {t.route.sufficientBattery}
                 </Text>
               </View>
             )}
@@ -421,7 +421,7 @@ export default function RouteScreen() {
                           {stop.station.address}
                         </Text>
                         <Text style={[styles.stopDistance, { color: colors.textSecondary }]}>
-                          {Math.round(stop.distanceFromStart)} km od startu
+                          {Math.round(stop.distanceFromStart)} km {t.route.fromStart}
                         </Text>
                       </View>
                       <View style={[
@@ -455,7 +455,7 @@ export default function RouteScreen() {
 
                     <View style={styles.stopCost}>
                       <Text style={[styles.stopCostLabel, { color: colors.textSecondary }]}>
-                        Odhadovaná cena:
+                        {t.route.estimatedPrice}:
                       </Text>
                       <Text style={[styles.stopCostValue, { color: Colors.brand.accentGreen }]}>
                         {stop.chargeCost} Kč
@@ -485,10 +485,10 @@ export default function RouteScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="navigate-circle-outline" size={80} color={colors.textMuted} />
             <Text style={[styles.emptyStateTitle, { color: colors.text }]}>
-              Naplánujte si cestu
+              {t.route.emptyStateTitle}
             </Text>
             <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-              Zadejte odkud a kam jedete, a najdeme vám optimální nabíjecí zastávky ze sítě ZAspot
+              {t.route.emptyStateDesc}
             </Text>
           </View>
         )}
