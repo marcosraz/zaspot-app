@@ -41,6 +41,7 @@ import {
 } from '../../../lib/charging';
 import { fetchEffectivePrices, EffectivePrices, formatPrice } from '../../../lib/pricing';
 import { createReservation } from '../../../lib/reservations';
+import { openNavigationTo } from '../../../lib/navigation';
 
 // ─── Component ───────────────────────────────────
 
@@ -213,11 +214,7 @@ export default function StationDetailScreen() {
 
   const handleNavigate = () => {
     if (!station?.locationLat || !station?.locationLng) return;
-    const url = Platform.select({
-      ios: `maps://app?daddr=${station.locationLat},${station.locationLng}`,
-      android: `google.navigation:q=${station.locationLat},${station.locationLng}`,
-    });
-    if (url) Linking.openURL(url);
+    openNavigationTo(station.locationLat, station.locationLng, station.name);
   };
 
   // ─── Helpers ───────────────────────────────────

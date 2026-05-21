@@ -29,6 +29,7 @@ import {
   RouteResult,
   RoutePoint,
 } from '../../lib/routePlanner';
+import { openNavigationTo } from '../../lib/navigation';
 
 export default function RouteScreen() {
   const { colors, isDark } = useTheme();
@@ -147,15 +148,9 @@ export default function RouteScreen() {
     }
   };
 
-  // Open navigation to a station
-  const navigateToStation = (latitude: number, longitude: number) => {
-    const url = Platform.select({
-      ios: `maps://app?daddr=${latitude},${longitude}`,
-      android: `google.navigation:q=${latitude},${longitude}`,
-    });
-    if (url) {
-      Linking.openURL(url);
-    }
+  // Open navigation to a station (uses shared helper — fixes prior broken iOS URL)
+  const navigateToStation = (latitude: number, longitude: number, name?: string) => {
+    openNavigationTo(latitude, longitude, name);
   };
 
   const formatDuration = (minutes: number) => {
@@ -465,7 +460,7 @@ export default function RouteScreen() {
                     <View style={styles.stopActions}>
                       <TouchableOpacity
                         style={[styles.stopActionBtn, { borderColor: Colors.brand.accentGreen }]}
-                        onPress={() => navigateToStation(stop.station.latitude, stop.station.longitude)}
+                        onPress={() => navigateToStation(stop.station.latitude, stop.station.longitude, stop.station.name)}
                       >
                         <Ionicons name="navigate-outline" size={18} color={Colors.brand.accentGreen} />
                         <Text style={[styles.stopActionText, { color: Colors.brand.accentGreen }]}>

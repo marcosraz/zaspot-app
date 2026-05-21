@@ -28,6 +28,7 @@ import { Layout } from '../../constants/layout';
 import { ChargingStation } from '../../lib/stations';
 import { fetchStationsWithCache, fetchOcppStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
 import { fetchEmpStations } from '../../lib/v2Features';
+import { openNavigationTo } from '../../lib/navigation';
 import FavoriteButton from '../../components/FavoriteButton';
 import { LiveStationPrice } from '../../components/LiveStationPrice';
 
@@ -222,11 +223,7 @@ export default function MapScreen() {
   };
 
   const openNavigation = (station: ChargingStation) => {
-    const url = Platform.select({
-      ios: `maps://app?daddr=${station.latitude},${station.longitude}`,
-      android: `google.navigation:q=${station.latitude},${station.longitude}`,
-    });
-    if (url) Linking.openURL(url);
+    openNavigationTo(station.latitude, station.longitude, station.name);
   };
 
   // Push user location into WebView whenever it's available

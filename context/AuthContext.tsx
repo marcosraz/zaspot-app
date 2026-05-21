@@ -14,6 +14,7 @@ import {
   apiRegister,
   apiForgotPassword,
   apiResendVerification,
+  apiGoogleLogin,
   API_BASE,
 } from '../lib/api';
 
@@ -22,6 +23,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (idToken: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -141,6 +143,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    try {
+      const res = await apiGoogleLogin(idToken);
+      if (res.ok) {
+        await storeAuth({
+          token: res.data.token,
+          user: res.data.user,
+          expiresAt: res.data.expiresAt,
+        });
+        setUser(res.data.user);
+        return { success: true };
+      }
+      const errorData = res.data as any;
+      return { success: false, error: errorData?.error || 'google_login_failed' };
+    } catch {
+      return { success: false, error: 'network_error' };
+    }
+  }, []);
+
   const register = useCallback(async (email: string, password: string, name: string) => {
     try {
       const res = await apiRegister(email.trim().toLowerCase(), password, name.trim());
@@ -197,6 +218,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isAuthenticated,
         isLoading,
         login,
+        loginWithGoogle,
         register,
         logout,
         forgotPassword,

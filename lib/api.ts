@@ -236,4 +236,16 @@ export async function apiResendVerification(email: string): Promise<ApiResponse<
   });
 }
 
+/**
+ * Exchanges a Google ID token (obtained client-side via expo-auth-session)
+ * for a ZAspot mobile JWT. Server side validates the token signature against
+ * Google's public keys before issuing our JWT.
+ */
+export async function apiGoogleLogin(idToken: string): Promise<ApiResponse<LoginResponse>> {
+  return apiFetch<LoginResponse>('/auth/mobile-google', {
+    method: 'POST',
+    body: JSON.stringify({ idToken }),
+  });
+}
+
 export { API_BASE };

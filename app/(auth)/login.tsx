@@ -3,7 +3,7 @@
  * Email/password authentication with validation
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,24 +19,68 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 
+// Required by expo-auth-session so the OAuth callback can return to the app
+// when the browser is dismissed. Idempotent — safe to call multiple times.
+WebBrowser.maybeCompleteAuthSession();
+
 export default function LoginScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
-  const { login } = useAuth();
+  const { login, loginWithGoogle } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const passwordRef = useRef<TextInput>(null);
+
+  // Google OAuth setup — client IDs come from env (see app.config.js).
+  // We pass platform-specific IDs so the SDK picks the right one at runtime.
+  const [googleRequest, googleResponse, promptGoogle] = Google.useAuthRequest({
+    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+  });
+
+  // When the Google flow returns, exchange the id_token for our ZAspot JWT.
+  useEffect(() => {
+    if (googleResponse?.type !== 'success') return;
+    const idToken = googleResponse.authentication?.idToken
+      ?? (googleResponse.params as any)?.id_token;
+    if (!idToken) return;
+    (async () => {
+      setGoogleLoading(true);
+      setErrors({});
+      const result = await loginWithGoogle(idToken);
+      setGoogleLoading(false);
+      if (result.success) {
+        router.replace('/(tabs)');
+      } else {
+        setErrors({ general: msg[result.error || 'invalid_credentials'] || msg.network_error });
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleResponse]);
+
+  const handleGoogleLogin = async () => {
+    setErrors({});
+    try {
+      await promptGoogle();
+    } catch (err) {
+      setErrors({ general: msg.network_error });
+    }
+  };
 
   const errorMessages: Record<string, Record<string, string>> = {
     cz: {
@@ -308,6 +352,41 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Divider — "or" */}
+          <View style={styles.dividerRow}>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textMuted }]}>
+              {language === 'de' ? 'oder' : language === 'cz' ? 'nebo' : language === 'pl' ? 'lub' : 'or'}
+            </Text>
+            <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+          </View>
+
+          {/* Google Sign-In Button */}
+          <TouchableOpacity
+            onPress={handleGoogleLogin}
+            disabled={!googleRequest || googleLoading}
+            style={[
+              styles.googleButton,
+              { borderColor: colors.border, backgroundColor: isDark ? '#1F2937' : '#FFFFFF' },
+              (!googleRequest || googleLoading) && styles.buttonDisabled,
+            ]}
+            activeOpacity={0.8}
+          >
+            {googleLoading ? (
+              <ActivityIndicator color={Colors.brand.accentGreen} size="small" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#EA4335" />
+                <Text style={[styles.googleButtonText, { color: colors.text }]}>
+                  {language === 'de' ? 'Mit Google anmelden'
+                    : language === 'cz' ? 'Přihlásit přes Google'
+                    : language === 'pl' ? 'Zaloguj przez Google'
+                    : 'Continue with Google'}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+
           {/* Register Link */}
           <View style={styles.registerRow}>
             <Text style={[styles.registerText, { color: colors.textSecondary }]}>
@@ -427,6 +506,35 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Layout.fontSize.lg,
     fontWeight: '700',
+  },
+  dividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: Layout.spacing.md,
+    gap: Layout.spacing.sm,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+  },
+  dividerText: {
+    fontSize: Layout.fontSize.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  googleButton: {
+    height: 52,
+    borderRadius: Layout.borderRadius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: Layout.spacing.lg,
+  },
+  googleButtonText: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '600',
   },
   registerRow: {
     flexDirection: 'row',

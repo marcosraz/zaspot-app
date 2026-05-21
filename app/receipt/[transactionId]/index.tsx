@@ -13,7 +13,11 @@ import {
   ActivityIndicator,
   Alert,
   Share,
+  Platform,
 } from 'react-native';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -54,6 +58,7 @@ export default function ReceiptScreen() {
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [loading, setLoading] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [savingPdf, setSavingPdf] = useState(false);
 
   useEffect(() => {
     async function loadReceipt() {
@@ -93,6 +98,104 @@ export default function ReceiptScreen() {
       });
     } catch (error) {
       // User cancelled share
+    }
+  };
+
+  // Build a clean, print-friendly HTML version of the receipt for PDF export.
+  // Inline CSS keeps PDFs identical across iOS/Android (each uses its native WebKit/WebView).
+  const buildReceiptHtml = (r: ReceiptData): string => {
+    const fmtPrice = (n: number) => n.toFixed(2).replace('.', ',');
+    return `
+<!DOCTYPE html>
+<html lang="${language}">
+<head>
+<meta charset="utf-8" />
+<title>ZAspot Receipt #${r.transactionId}</title>
+<style>
+  @page { size: A4; margin: 16mm; }
+  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #111; line-height: 1.4; }
+  h1 { color: #16A34A; margin: 0 0 4px; font-size: 26px; }
+  .sub { color: #6B7280; font-size: 13px; margin-bottom: 24px; }
+  .card { border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F3F4F6; }
+  .row:last-child { border-bottom: none; }
+  .label { color: #6B7280; font-size: 13px; }
+  .val { color: #111827; font-weight: 600; font-size: 14px; }
+  .total { font-size: 22px; color: #16A34A; font-weight: 700; }
+  .station { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .station-id { color: #6B7280; font-size: 12px; margin-bottom: 16px; }
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+           background: ${r.status === 'completed' ? '#DCFCE7' : '#DBEAFE'};
+           color: ${r.status === 'completed' ? '#16A34A' : '#3B82F6'}; }
+  .footer { text-align: center; color: #9CA3AF; font-size: 11px; margin-top: 24px; }
+</style>
+</head>
+<body>
+  <h1>ZAspot</h1>
+  <div class="sub">${l.title} #${r.transactionId} · <span class="badge">${r.status === 'completed' ? l.completed : l.active}</span></div>
+
+  <div class="card">
+    <div class="station">${r.stationName}</div>
+    <div class="station-id">${r.stationIdentity} · ${l.connector} ${r.connectorId}</div>
+    <div class="row"><span class="label">${l.date}</span><span class="val">${formatDate(r.startTimestamp)}</span></div>
+    <div class="row"><span class="label">${l.startTime}</span><span class="val">${formatTime(r.startTimestamp)}</span></div>
+    ${r.stopTimestamp ? `<div class="row"><span class="label">${l.endTime}</span><span class="val">${formatTime(r.stopTimestamp)}</span></div>` : ''}
+    <div class="row"><span class="label">${l.duration || 'Duration'}</span><span class="val">${formatDuration(r.durationMinutes)}</span></div>
+    <div class="row"><span class="label">${l.energy}</span><span class="val">${formatEnergy(r.energyKwh)} kWh</span></div>
+    ${r.avgSpotPriceCzkKwh ? `<div class="row"><span class="label">${(l as any).avgPrice || 'Avg. price'}</span><span class="val">${fmtPrice(r.avgSpotPriceCzkKwh)} CZK/kWh</span></div>` : ''}
+    <div class="row"><span class="label">${l.total}</span><span class="val total">${fmtPrice(r.totalCostCzk)} CZK</span></div>
+    ${r.userName ? `<div class="row"><span class="label">${(l as any).customer || 'Customer'}</span><span class="val">${r.userName}</span></div>` : ''}
+  </div>
+
+  <div class="footer">
+    Sdil Building Automotive s.r.o. · IČO 09873236 · DIČ CZ09873236<br/>
+    Štefánikova 605/46b, 612 00 Brno · zaspot.cz
+  </div>
+</body>
+</html>`;
+  };
+
+  const handleSavePdf = async () => {
+    if (!receipt) return;
+    setSavingPdf(true);
+    try {
+      // Print.printToFileAsync renders our HTML via the system's PDF engine
+      // (no extra dependencies; same engine that prints from Safari/Chrome).
+      const { uri } = await Print.printToFileAsync({
+        html: buildReceiptHtml(receipt),
+        base64: false,
+      });
+
+      // Rename so the OS share/save sheet shows a human-friendly filename.
+      // expo-file-system v19 introduced the File/Paths object API.
+      const filename = `ZAspot-Receipt-${receipt.transactionId}.pdf`;
+      let finalUri = uri;
+      try {
+        const source = new File(uri);
+        const dest = new File(Paths.cache, filename);
+        // If a previous export sits there, replace it.
+        if (dest.exists) dest.delete();
+        source.move(dest);
+        finalUri = dest.uri;
+      } catch {
+        // Fall back to original URI; share sheet still works, just with the raw filename.
+      }
+
+      // Sharing.shareAsync opens the native share sheet so the user can
+      // "Save to Files", "Save to Photos", AirDrop, mail it, etc.
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(finalUri, {
+          UTI: 'com.adobe.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: l.title,
+        });
+      } else {
+        Alert.alert(l.title, finalUri);
+      }
+    } catch (err: any) {
+      Alert.alert(l.error || 'Error', err?.message || 'Could not generate PDF');
+    } finally {
+      setSavingPdf(false);
     }
   };
 
@@ -156,9 +259,22 @@ export default function ReceiptScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{l.title}</Text>
-        <TouchableOpacity onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Ionicons name="share-outline" size={24} color={colors.text} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={handleSavePdf}
+            disabled={savingPdf}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            {savingPdf ? (
+              <ActivityIndicator size="small" color={Colors.brand.accentGreen} />
+            ) : (
+              <Ionicons name="download-outline" size={24} color={colors.text} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleShare} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="share-outline" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
