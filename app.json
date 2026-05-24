@@ -16,7 +16,16 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "cz.zaspot.app",
-      "buildNumber": "4"
+      "buildNumber": "5",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "com.googleusercontent.apps.819686551727-lfjt408d3liucikppjtoqpjs0l3mg2pg"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
