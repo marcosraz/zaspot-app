@@ -18,13 +18,21 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'cz.zaspot.app',
-    buildNumber: '1',
+    buildNumber: '100',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
       NSLocationWhenInUseUsageDescription:
         'ZAspot zobrazuje nabíjecí stanice v okolí na mapě.',
       NSLocationAlwaysAndWhenInUseUsageDescription:
         'ZAspot zobrazuje nabíjecí stanice v okolí na mapě.',
+      // Reversed iOS Client ID — required for Google OAuth redirect back into app
+      CFBundleURLTypes: [
+        {
+          CFBundleURLSchemes: [
+            'com.googleusercontent.apps.819686551727-lfjt408d3liucikppjtoqpjs0l3mg2pg',
+          ],
+        },
+      ],
     },
   },
   android: {
