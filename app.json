@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "cz.zaspot.app",
-      "buildNumber": "5",
+      "buildNumber": "10",
       "infoPlist": {
         "CFBundleURLTypes": [
           {
