@@ -30,14 +30,20 @@
       "ios": {
         "appleId": "marek.heidinger@gmail.com",
         "appleTeamId": "2DR983VXCS",
-        "ascAppId": "6770471470"
+        "ascAppId": "6770471470",
+        "ascApiKeyPath": "$ASC_API_KEY_PATH",
+        "ascApiKeyId": "$ASC_API_KEY_ID",
+        "ascApiKeyIssuerId": "$ASC_API_KEY_ISSUER_ID"
       }
     },
     "production": {
       "ios": {
         "appleId": "marek.heidinger@gmail.com",
         "appleTeamId": "2DR983VXCS",
-        "ascAppId": "6770471470"
+        "ascAppId": "6770471470",
+        "ascApiKeyPath": "$ASC_API_KEY_PATH",
+        "ascApiKeyId": "$ASC_API_KEY_ID",
+        "ascApiKeyIssuerId": "$ASC_API_KEY_ISSUER_ID"
       }
     }
   }
