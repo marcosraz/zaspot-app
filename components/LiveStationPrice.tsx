@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { API_BASE } from '../lib/api';
-import { Colors } from '../constants/Colors';
+import { Colors } from '../constants/colors';
 
 interface Props {
   /** OCPP charge_point_id, e.g. "CZ-ZAS-E00018". Pass ChargingStation.external_id. */

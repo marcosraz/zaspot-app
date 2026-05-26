@@ -3,7 +3,7 @@
  * Email/password authentication with validation
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,17 +19,26 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
+import {
+  GoogleSignin,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 
-// Required by expo-auth-session so the OAuth callback can return to the app
-// when the browser is dismissed. Idempotent — safe to call multiple times.
-WebBrowser.maybeCompleteAuthSession();
+// Configure GoogleSignin once at module load. The webClientId tells Google
+// to issue id_tokens with that audience — our backend verifies tokens against
+// this audience. iOS uses iosClientId for the native Sign-In dialog; Android
+// uses webClientId + the package's SHA-1 (registered in Google Cloud).
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+  scopes: ['profile', 'email'],
+  offlineAccess: false,
+});
 
 export default function LoginScreen() {
   const { colors, isDark } = useTheme();
@@ -45,40 +54,41 @@ export default function LoginScreen() {
 
   const passwordRef = useRef<TextInput>(null);
 
-  // Google OAuth setup — client IDs come from env (see app.config.js).
-  // We pass platform-specific IDs so the SDK picks the right one at runtime.
-  const [googleRequest, googleResponse, promptGoogle] = Google.useAuthRequest({
-    iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
-    androidClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
-  });
-
-  // When the Google flow returns, exchange the id_token for our ZAspot JWT.
-  useEffect(() => {
-    if (googleResponse?.type !== 'success') return;
-    const idToken = googleResponse.authentication?.idToken
-      ?? (googleResponse.params as any)?.id_token;
-    if (!idToken) return;
-    (async () => {
-      setGoogleLoading(true);
-      setErrors({});
-      const result = await loginWithGoogle(idToken);
-      setGoogleLoading(false);
-      if (result.success) {
-        router.replace('/(tabs)');
-      } else {
-        setErrors({ general: msg[result.error || 'invalid_credentials'] || msg.network_error });
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [googleResponse]);
-
+  // Native Google Sign-In via @react-native-google-signin/google-signin.
+  // Uses Google Play Services on Android and the native sign-in dialog on iOS.
+  // Returns an id_token signed with the WEB client's audience — our backend
+  // verifies it via /api/auth/mobile-google.
   const handleGoogleLogin = async () => {
     setErrors({});
+    setGoogleLoading(true);
     try {
-      await promptGoogle();
-    } catch (err) {
+      // hasPlayServices throws on Android if Google Play Services missing/outdated
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+
+      // Make sure we always show the chooser even if the user previously signed in
+      try { await GoogleSignin.signOut(); } catch { /* ignore */ }
+
+      const result: any = await GoogleSignin.signIn();
+      // GoogleSignin v15+ wraps the payload in a `data` field. v14 had it at top level.
+      const idToken: string | undefined = result?.data?.idToken ?? result?.idToken;
+
+      if (!idToken) {
+        setErrors({ general: msg.network_error });
+        return;
+      }
+
+      const r = await loginWithGoogle(idToken);
+      if (r.success) {
+        router.replace('/(tabs)');
+      } else {
+        setErrors({ general: msg[r.error || 'invalid_credentials'] || msg.network_error });
+      }
+    } catch (err: any) {
+      // User cancelled — silent, not an error
+      if (err?.code === statusCodes.SIGN_IN_CANCELLED || err?.code === statusCodes.IN_PROGRESS) return;
       setErrors({ general: msg.network_error });
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -364,11 +374,11 @@ export default function LoginScreen() {
           {/* Google Sign-In Button */}
           <TouchableOpacity
             onPress={handleGoogleLogin}
-            disabled={!googleRequest || googleLoading}
+            disabled={googleLoading}
             style={[
               styles.googleButton,
               { borderColor: colors.border, backgroundColor: isDark ? '#1F2937' : '#FFFFFF' },
-              (!googleRequest || googleLoading) && styles.buttonDisabled,
+              googleLoading && styles.buttonDisabled,
             ]}
             activeOpacity={0.8}
           >

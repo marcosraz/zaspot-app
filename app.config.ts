@@ -66,6 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-location',
     'expo-secure-store',
     'expo-web-browser',
+    '@react-native-google-signin/google-signin',
   ],
   extra: {
     router: {},
