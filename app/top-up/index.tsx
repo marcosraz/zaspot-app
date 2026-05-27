@@ -28,8 +28,12 @@ export default function TopUpScreen() {
       return;
     }
     setSubmitting(true);
-    await topUp(a);
+    const result = await topUp(a);
     setSubmitting(false);
+    // Surface errors to the user — silent failures were the previous UX bug
+    if (!result.success) {
+      Alert.alert('Platbu se nepodařilo zahájit', result.error || 'Zkuste to prosím znovu.');
+    }
   };
 
   const onBank = async () => {

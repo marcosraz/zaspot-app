@@ -78,18 +78,21 @@ export function CreditProvider({ children }: CreditProviderProps) {
 
   const topUp = useCallback(async (amountCzk: number): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await apiFetch<{ success: boolean; paymentUrl?: string; error?: string }>(
+      const res = await apiFetch<{ success: boolean; payment_url?: string; paymentUrl?: string; order_number?: string; error?: string }>(
         '/payment/create',
         {
           method: 'POST',
-          body: JSON.stringify({ amount: amountCzk }),
+          // Backend expects snake_case `amount_czk` (see app/api/payment/create/route.ts)
+          body: JSON.stringify({ amount_czk: amountCzk }),
           requireAuth: true,
         }
       );
 
-      if (res.ok && res.data.paymentUrl) {
+      // Backend returns `payment_url` (snake_case). Older fallback for `paymentUrl`.
+      const paymentUrl = res.ok ? (res.data.payment_url ?? res.data.paymentUrl) : undefined;
+      if (res.ok && paymentUrl) {
         // Open GP webpay payment page in browser
-        const result = await WebBrowser.openBrowserAsync(res.data.paymentUrl, {
+        const result = await WebBrowser.openBrowserAsync(paymentUrl, {
           dismissButtonStyle: 'cancel',
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
         });
