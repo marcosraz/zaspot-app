@@ -288,7 +288,7 @@ export default function ProfileScreen() {
             </View>
             <TouchableOpacity
               style={[styles.topUpBtn, { backgroundColor: Colors.brand.accentGreen }]}
-              onPress={() => topUp(100)}
+              onPress={() => router.push('/top-up')}
               activeOpacity={0.8}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
