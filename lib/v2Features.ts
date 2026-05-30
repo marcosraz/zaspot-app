@@ -189,6 +189,34 @@ export interface BankTransferInfo {
   expires_at?: string;
 }
 
+// Subset of bank_transfer_requests row returned by /active
+export interface PendingTransfer {
+  id: string;
+  amount_czk: number;
+  variable_symbol: string;
+  status: string;
+  expires_at: string;
+  created_at: string;
+}
+
+export async function fetchActiveBankTransfers() {
+  return apiFetch<{ success: boolean; transfers: PendingTransfer[] }>(
+    '/payment/bank-transfer/active',
+    { requireAuth: true },
+  );
+}
+
+export async function cancelBankTransfer(id: string) {
+  return apiFetch<{ success: boolean; error?: string }>(
+    '/payment/bank-transfer/cancel',
+    {
+      method: 'POST',
+      body: JSON.stringify({ id }),
+      requireAuth: true,
+    },
+  );
+}
+
 // Backend endpoint is /payment/bank-transfer/create (not /payment/bank-transfer).
 // Response shape is flat — fields live at the top level, not under .transfer.
 export async function requestBankTransfer(amountCzk: number) {
