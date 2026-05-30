@@ -389,7 +389,7 @@ export default function StationDetailScreen() {
           {l.connectors}
         </Text>
 
-        {station.connectors.map((connector) => {
+        {station.connectors.filter((c) => c.connectorId !== 0).map((connector) => {
           const activeSession = getActiveSessionForConnector(connector.connectorId);
           const statusColor = getConnectorStatusColor(connector.status);
           const isCharging = connector.status === 'Charging';
