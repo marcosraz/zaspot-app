@@ -67,6 +67,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-web-browser',
     '@react-native-google-signin/google-signin',
+    [
+      'expo-camera',
+      {
+        cameraPermission: 'ZAspot potřebuje přístup k fotoaparátu pro skenování QR kódů u nabíjecích stanic.',
+      },
+    ],
   ],
   extra: {
     router: {},

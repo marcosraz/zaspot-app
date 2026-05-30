@@ -486,6 +486,15 @@ export default function MapScreen() {
         <Ionicons name="locate" size={24} color={Colors.brand.accentGreen} />
       </TouchableOpacity>
 
+      {/* QR Scan Button — opens the station QR scanner full-screen */}
+      <TouchableOpacity
+        style={[styles.scanButton, { backgroundColor: Colors.brand.accentGreen }]}
+        onPress={() => router.push('/scan')}
+        accessibilityLabel="Skenovat QR kód stanice"
+      >
+        <Ionicons name="qr-code-outline" size={26} color="#fff" />
+      </TouchableOpacity>
+
       {/* Station Detail Card */}
       {selectedStation && (
         <View style={[styles.stationCard, { backgroundColor: colors.surface }]}>
@@ -955,6 +964,21 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
+  },
+  scanButton: {
+    position: 'absolute',
+    right: 16,
+    bottom: 380,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
   },
   marker: {
     width: 32,

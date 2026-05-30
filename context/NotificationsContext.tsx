@@ -10,6 +10,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { apiFetch } from '../lib/api';
 import { useLanguage } from './LanguageContext';
+import { useAuth } from './AuthContext';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -84,6 +85,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   const notificationListener = useRef<Notifications.Subscription | null>(null);
   const responseListener = useRef<Notifications.Subscription | null>(null);
   const { t } = useLanguage();
+  const { user } = useAuth();
 
   // Load settings on mount
   useEffect(() => {
@@ -115,6 +117,17 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
       saveSettings(settings);
     }
   }, [settings, isLoaded]);
+
+  // Re-register the push token whenever the user logs in. The mount-time
+  // register only ships a token if permission is already granted AND the
+  // user is already authenticated — which usually isn't the case on first
+  // launch. This effect fills that gap so first-time sign-ups also get
+  // their token registered against the backend.
+  useEffect(() => {
+    if (user && settings.permissionGranted) {
+      getPushTokenAndRegister().catch(() => { /* logged inside */ });
+    }
+  }, [user?.id, settings.permissionGranted]);
 
   const loadSettings = async () => {
     try {
