@@ -69,8 +69,10 @@ export default function HistoryScreen() {
     setRefreshing(false);
   };
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '—';
     const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString(getLocale(language), {
       day: 'numeric',
       month: 'short',
@@ -80,8 +82,14 @@ export default function HistoryScreen() {
   };
 
   const getDurationMinutes = (tx: UserTransaction): number => {
-    if (!tx.stopTimestamp) return (Date.now() - new Date(tx.startTimestamp).getTime()) / 60000;
-    return (new Date(tx.stopTimestamp).getTime() - new Date(tx.startTimestamp).getTime()) / 60000;
+    // Defensive: missing start → no duration calculable; return 0 so formatDuration
+    // doesn't render "NaNh".
+    if (!tx.startTimestamp) return 0;
+    const start = new Date(tx.startTimestamp).getTime();
+    if (isNaN(start)) return 0;
+    const end = tx.stopTimestamp ? new Date(tx.stopTimestamp).getTime() : Date.now();
+    if (isNaN(end)) return 0;
+    return (end - start) / 60000;
   };
 
   // Not authenticated

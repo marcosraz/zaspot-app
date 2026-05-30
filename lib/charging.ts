@@ -203,6 +203,8 @@ export function getConnectorStatusColor(status: string): string {
  * Format duration from minutes to human-readable
  */
 export function formatDuration(minutes: number): string {
+  // Guard against NaN/undefined — caller may compute duration from missing timestamps.
+  if (!Number.isFinite(minutes) || minutes <= 0) return '—';
   if (minutes < 1) return '<1 min';
   if (minutes < 60) return `${Math.round(minutes)} min`;
   const h = Math.floor(minutes / 60);

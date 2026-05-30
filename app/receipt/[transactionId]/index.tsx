@@ -63,9 +63,14 @@ export default function ReceiptScreen() {
   useEffect(() => {
     async function loadReceipt() {
       if (!transactionId) return;
-      const res = await apiFetch<ReceiptData>(`/receipt/${transactionId}`);
-      if (res.ok) {
-        setReceipt(res.data);
+      // Auth is required for wallet/autocharge receipts; backend gates by ownership.
+      // The response is wrapped — `{ success, receipt, error }` — so unwrap before storing.
+      const res = await apiFetch<{ success: boolean; receipt?: ReceiptData; error?: string }>(
+        `/receipt/${transactionId}`,
+        { requireAuth: true },
+      );
+      if (res.ok && res.data?.receipt) {
+        setReceipt(res.data.receipt);
       }
       setLoading(false);
     }

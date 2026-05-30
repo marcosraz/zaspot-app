@@ -179,24 +179,34 @@ export async function requestMagicLink(email: string) {
 // ─── Bank Transfer ───────────────────────────────
 
 export interface BankTransferInfo {
-  account_number: string;
   iban: string;
-  swift: string;
+  bic: string;
+  recipient: string;
   variable_symbol: string;
   amount_czk: number;
-  recipient_name: string;
-  message: string;
+  spd_string?: string;
+  qr_data_url?: string;
+  expires_at?: string;
 }
 
+// Backend endpoint is /payment/bank-transfer/create (not /payment/bank-transfer).
+// Response shape is flat — fields live at the top level, not under .transfer.
 export async function requestBankTransfer(amountCzk: number) {
-  return apiFetch<{ success: boolean; transfer?: BankTransferInfo; error?: string }>(
-    '/payment/bank-transfer',
-    {
-      method: 'POST',
-      body: JSON.stringify({ amount_czk: amountCzk }),
-      requireAuth: true,
-    }
-  );
+  const res = await apiFetch<
+    | (BankTransferInfo & { success: true; id: string })
+    | { success: false; error?: string }
+  >('/payment/bank-transfer/create', {
+    method: 'POST',
+    body: JSON.stringify({ amount_czk: amountCzk }),
+    requireAuth: true,
+  });
+
+  if (res.ok && res.data.success) {
+    const { success: _s, id: _id, ...transfer } = res.data;
+    return { ok: true as const, data: { success: true, transfer: transfer as BankTransferInfo } };
+  }
+  const errMsg = res.ok ? ('error' in res.data ? res.data.error : undefined) : undefined;
+  return { ok: false as const, data: { success: false, error: errMsg ?? 'bank_transfer_failed' } };
 }
 
 // ─── Achievements ────────────────────────────────

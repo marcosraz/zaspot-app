@@ -55,7 +55,7 @@ export default function TopUpScreen() {
   const share = async () => {
     if (!bankInfo) return;
     await Share.share({
-      message: `IBAN: ${bankInfo.iban}\nČástka: ${bankInfo.amount_czk} Kč\nVS: ${bankInfo.variable_symbol}\nZpráva: ${bankInfo.message}`,
+      message: `IBAN: ${bankInfo.iban}\nBIC: ${bankInfo.bic}\nPříjemce: ${bankInfo.recipient}\nČástka: ${bankInfo.amount_czk} Kč\nVS: ${bankInfo.variable_symbol}`,
     });
   };
 
@@ -69,11 +69,10 @@ export default function TopUpScreen() {
               <Ionicons name="business" size={32} color={Colors.brand.accentGreen} style={{ alignSelf: 'center' }} />
               <Text style={[styles.bankTitle, { color: colors.text }]}>Údaje k převodu</Text>
               <BankRow label="IBAN" value={bankInfo.iban} colors={colors} />
-              <BankRow label="Účet" value={bankInfo.account_number} colors={colors} />
-              <BankRow label="SWIFT" value={bankInfo.swift} colors={colors} />
+              <BankRow label="BIC/SWIFT" value={bankInfo.bic} colors={colors} />
+              <BankRow label="Příjemce" value={bankInfo.recipient} colors={colors} />
               <BankRow label="Částka" value={`${bankInfo.amount_czk} Kč`} colors={colors} bold />
               <BankRow label="VS" value={bankInfo.variable_symbol} colors={colors} bold />
-              <BankRow label="Zpráva" value={bankInfo.message} colors={colors} />
 
               <TouchableOpacity onPress={share} style={[styles.btn, { backgroundColor: Colors.brand.accentGreen }]}>
                 <Ionicons name="share-outline" size={18} color="#fff" />
