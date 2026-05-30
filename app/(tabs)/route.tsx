@@ -154,12 +154,22 @@ export default function RouteScreen() {
   };
 
   const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
+    // Floor the total minutes first so floating-point remainders (e.g. 124.32...)
+    // don't bleed into the displayed minutes. Without this, "% 60" returns 4.32...
+    const total = Math.round(minutes);
+    const hours = Math.floor(total / 60);
+    const mins = total % 60;
     if (hours > 0) {
-      return `${hours} h ${mins} min`;
+      return mins > 0 ? `${hours} h ${mins} min` : `${hours} h`;
     }
     return `${mins} min`;
+  };
+
+  const formatDistance = (km: number) => {
+    // Localised thousand separator, rounded to whole km for legibility.
+    // Short distances under 10 km still show one decimal so "8.5 km" stays useful.
+    if (km < 10) return `${km.toFixed(1).replace('.', ',')} km`;
+    return `${Math.round(km).toLocaleString('cs-CZ')} km`;
   };
 
   return (
@@ -332,7 +342,7 @@ export default function RouteScreen() {
                 <View style={styles.summaryItem}>
                   <Ionicons name="map" size={24} color={Colors.brand.accentGreen} />
                   <Text style={[styles.summaryValue, { color: colors.text }]}>
-                    {routeResult.totalDistance} km
+                    {formatDistance(routeResult.totalDistance)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
                     {t.route.distance}
