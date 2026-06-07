@@ -12,6 +12,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import { ThemeProvider, useTheme } from '../context/ThemeContext';
 import { LanguageProvider } from '../context/LanguageContext';
+import { CurrencyProvider } from '../context/CurrencyContext';
 import { AuthProvider } from '../context/AuthContext';
 import { CreditProvider } from '../context/CreditContext';
 import { FavoritesProvider } from '../context/FavoritesContext';
@@ -134,6 +135,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <LanguageProvider>
+            <CurrencyProvider>
             <AuthProvider>
               <CreditProvider>
                 <FavoritesProvider>
@@ -147,6 +149,7 @@ export default function RootLayout() {
               </FavoritesProvider>
               </CreditProvider>
             </AuthProvider>
+            </CurrencyProvider>
           </LanguageProvider>
         </ThemeProvider>
       </SafeAreaProvider>

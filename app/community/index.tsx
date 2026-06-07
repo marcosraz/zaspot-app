@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -21,6 +22,7 @@ import {
 
 export default function CommunityScreen() {
   const { colors } = useTheme();
+  const { format } = useCurrency();
   const [community, setCommunity] = useState<CommunityInfo | null>(null);
   const [stats, setStats] = useState<MyCommunityStats | null>(null);
   const [billings, setBillings] = useState<any[]>([]);
@@ -112,7 +114,7 @@ export default function CommunityScreen() {
                   <StatCard
                     icon="cash"
                     label="Ušetřeno"
-                    value={`${stats.my_savings_czk.toFixed(0)} Kč`}
+                    value={format(stats.my_savings_czk, { decimals: 0 })}
                     highlight
                     colors={colors}
                   />
@@ -137,7 +139,7 @@ export default function CommunityScreen() {
                       <Text style={[styles.billPeriod, { color: colors.text }]}>{b.period_month}</Text>
                       <Text style={[styles.billSub, { color: colors.textMuted }]}>{b.energy_kwh.toFixed(1)} kWh</Text>
                     </View>
-                    <Text style={[styles.billAmount, { color: Colors.brand.accentGreen }]}>{b.total_czk.toFixed(0)} Kč</Text>
+                    <Text style={[styles.billAmount, { color: Colors.brand.accentGreen }]}>{format(b.total_czk, { decimals: 0 })}</Text>
                   </View>
                 ))
               )}

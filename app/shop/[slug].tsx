@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useShop } from '../../context/ShopContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchProduct, ShopProduct } from '../../lib/v2Features';
@@ -17,6 +18,7 @@ export default function ProductDetailScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { addToCart } = useShop();
+  const { format } = useCurrency();
   const [product, setProduct] = useState<ShopProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -57,7 +59,7 @@ export default function ProductDetailScreen() {
             <Image source={{ uri: product.image_url }} style={styles.image} resizeMode="cover" />
           )}
           <Text style={[styles.name, { color: colors.text }]}>{product.name}</Text>
-          <Text style={[styles.price, { color: Colors.brand.accentGreen }]}>{product.price_czk.toFixed(0)} Kč</Text>
+          <Text style={[styles.price, { color: Colors.brand.accentGreen }]}>{format(product.price_czk, { decimals: 0 })}</Text>
           {product.description && (
             <Text style={[styles.desc, { color: colors.textSecondary }]}>{product.description}</Text>
           )}
@@ -84,7 +86,7 @@ export default function ProductDetailScreen() {
           >
             <Ionicons name="cart" size={20} color="#fff" />
             <Text style={styles.addBtnText}>
-              {product.in_stock ? `Přidat do košíku · ${(product.price_czk * quantity).toFixed(0)} Kč` : 'Vyprodáno'}
+              {product.in_stock ? `Přidat do košíku · ${format(product.price_czk * quantity, { decimals: 0 })}` : 'Vyprodáno'}
             </Text>
           </TouchableOpacity>
         </View>

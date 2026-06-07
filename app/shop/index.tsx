@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useShop } from '../../context/ShopContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchProducts, ShopProduct } from '../../lib/v2Features';
@@ -16,6 +17,7 @@ export default function ShopScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { itemCount } = useShop();
+  const { format } = useCurrency();
   const [products, setProducts] = useState<ShopProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -86,7 +88,7 @@ export default function ShopScreen() {
               <View style={styles.cardBody}>
                 <Text style={[styles.name, { color: colors.text }]} numberOfLines={2}>{p.name}</Text>
                 <View style={styles.priceRow}>
-                  <Text style={[styles.price, { color: Colors.brand.accentGreen }]}>{p.price_czk.toFixed(0)} Kč</Text>
+                  <Text style={[styles.price, { color: Colors.brand.accentGreen }]}>{format(p.price_czk, { decimals: 0 })}</Text>
                   {!p.in_stock && (
                     <Text style={[styles.outOfStock, { color: colors.error }]}>Vyprodáno</Text>
                   )}

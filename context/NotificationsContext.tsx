@@ -11,6 +11,7 @@ import { Platform } from 'react-native';
 import { apiFetch } from '../lib/api';
 import { useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
+import { useCurrency } from './CurrencyContext';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -86,6 +87,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   const responseListener = useRef<Notifications.Subscription | null>(null);
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { format } = useCurrency();
 
   // Load settings on mount
   useEffect(() => {
@@ -296,7 +298,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         await Notifications.scheduleNotificationAsync({
           content: {
             title: alert.notifyBelow ? n.lowPriceTitle : n.highPriceTitle,
-            body: `${n.currentPrice} ${currentPrice.toFixed(2)} Kč/kWh ${alert.notifyBelow ? n.below : n.above} ${alert.thresholdKwh.toFixed(2)} Kč/kWh. ${alert.notifyBelow ? n.idealChargingTime : n.considerDelaying}`,
+            body: `${n.currentPrice} ${format(currentPrice, { perKwh: true })} ${alert.notifyBelow ? n.below : n.above} ${format(alert.thresholdKwh, { perKwh: true })}. ${alert.notifyBelow ? n.idealChargingTime : n.considerDelaying}`,
             data: { price: currentPrice, alertId: alert.id },
           },
           trigger: null, // Immediate
@@ -306,7 +308,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
         break; // Only send one notification at a time
       }
     }
-  }, [settings.permissionGranted, settings.priceAlerts, settings.lastNotificationTime]);
+  }, [settings.permissionGranted, settings.priceAlerts, settings.lastNotificationTime, format]);
 
   const sendTestNotification = useCallback(async () => {
     if (!settings.permissionGranted) {
@@ -388,7 +390,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
   ) => {
     if (!settings.permissionGranted) return;
 
-    const costText = costCzk != null ? ` • ${costCzk.toFixed(2)} CZK` : '';
+    const costText = costCzk != null ? ` • ${format(costCzk, { decimals: 2 })}` : '';
     await Notifications.scheduleNotificationAsync({
       content: {
         title: t.notifications.chargingCompleteTitle,
@@ -398,7 +400,7 @@ export function NotificationsProvider({ children }: NotificationsProviderProps) 
       },
       trigger: null,
     });
-  }, [settings.permissionGranted]);
+  }, [settings.permissionGranted, format]);
 
   return (
     <NotificationsContext.Provider

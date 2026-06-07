@@ -18,6 +18,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
@@ -27,6 +28,7 @@ import { UserTransaction, fetchUserTransactions, formatDuration, formatEnergy } 
 export default function HistoryScreen() {
   const { colors } = useTheme();
   const { language, t } = useLanguage();
+  const { format } = useCurrency();
   const { isAuthenticated } = useAuth();
 
   const [transactions, setTransactions] = useState<UserTransaction[]>([]);
@@ -188,7 +190,7 @@ export default function HistoryScreen() {
               <View style={styles.txStat}>
                 <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.cost}</Text>
                 <Text style={[styles.txStatValue, { color: colors.text }]}>
-                  {tx.totalCostCzk != null ? `${tx.totalCostCzk.toFixed(2)} CZK` : '—'}
+                  {tx.totalCostCzk != null ? format(tx.totalCostCzk, { decimals: 2 }) : '—'}
                 </Text>
               </View>
               <View style={styles.txStat}>

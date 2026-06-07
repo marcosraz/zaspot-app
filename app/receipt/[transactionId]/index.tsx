@@ -23,6 +23,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../../context/ThemeContext';
 import { useLanguage } from '../../../context/LanguageContext';
+import { useCurrency } from '../../../context/CurrencyContext';
 import { useAuth } from '../../../context/AuthContext';
 import { Colors } from '../../../constants/colors';
 import { Layout } from '../../../constants/layout';
@@ -51,6 +52,7 @@ export default function ReceiptScreen() {
   const { transactionId } = useLocalSearchParams<{ transactionId: string }>();
   const { colors, isDark } = useTheme();
   const { language, t } = useLanguage();
+  const { format } = useCurrency();
   const { user } = useAuth();
 
   const l = t.receipt;
@@ -99,7 +101,7 @@ export default function ReceiptScreen() {
     try {
       await Share.share({
         title: `${l.title} - ZAspot`,
-        message: `${l.receiptNo} ${receipt.transactionId}\n${l.station}: ${receipt.stationName}\n${l.energy}: ${formatEnergy(receipt.energyKwh)} kWh\n${l.total}: ${receipt.totalCostCzk.toFixed(2)} CZK\n${l.date}: ${formatDate(receipt.startTimestamp)}`,
+        message: `${l.receiptNo} ${receipt.transactionId}\n${l.station}: ${receipt.stationName}\n${l.energy}: ${formatEnergy(receipt.energyKwh)} kWh\n${l.total}: ${format(receipt.totalCostCzk, { decimals: 2 })}\n${l.date}: ${formatDate(receipt.startTimestamp)}`,
       });
     } catch (error) {
       // User cancelled share
@@ -109,7 +111,6 @@ export default function ReceiptScreen() {
   // Build a clean, print-friendly HTML version of the receipt for PDF export.
   // Inline CSS keeps PDFs identical across iOS/Android (each uses its native WebKit/WebView).
   const buildReceiptHtml = (r: ReceiptData): string => {
-    const fmtPrice = (n: number) => n.toFixed(2).replace('.', ',');
     return `
 <!DOCTYPE html>
 <html lang="${language}">
@@ -147,8 +148,8 @@ export default function ReceiptScreen() {
     ${r.stopTimestamp ? `<div class="row"><span class="label">${l.endTime}</span><span class="val">${formatTime(r.stopTimestamp)}</span></div>` : ''}
     <div class="row"><span class="label">${l.duration || 'Duration'}</span><span class="val">${formatDuration(r.durationMinutes)}</span></div>
     <div class="row"><span class="label">${l.energy}</span><span class="val">${formatEnergy(r.energyKwh)} kWh</span></div>
-    ${r.avgSpotPriceCzkKwh ? `<div class="row"><span class="label">${(l as any).avgPrice || 'Avg. price'}</span><span class="val">${fmtPrice(r.avgSpotPriceCzkKwh)} CZK/kWh</span></div>` : ''}
-    <div class="row"><span class="label">${l.total}</span><span class="val total">${fmtPrice(r.totalCostCzk)} CZK</span></div>
+    ${r.avgSpotPriceCzkKwh ? `<div class="row"><span class="label">${(l as any).avgPrice || 'Avg. price'}</span><span class="val">${format(r.avgSpotPriceCzkKwh, { perKwh: true })}</span></div>` : ''}
+    <div class="row"><span class="label">${l.total}</span><span class="val total">${format(r.totalCostCzk, { decimals: 2 })}</span></div>
     ${r.userName ? `<div class="row"><span class="label">${(l as any).customer || 'Customer'}</span><span class="val">${r.userName}</span></div>` : ''}
   </div>
 
@@ -383,7 +384,7 @@ export default function ReceiptScreen() {
               </View>
               <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{l.avgPrice}</Text>
               <Text style={[styles.detailValue, { color: colors.text }]}>
-                {receipt.avgSpotPriceCzkKwh.toFixed(2)} CZK/kWh
+                {format(receipt.avgSpotPriceCzkKwh, { perKwh: true })}
               </Text>
             </View>
           )}
@@ -392,7 +393,7 @@ export default function ReceiptScreen() {
           <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.totalLabel, { color: colors.text }]}>{l.total}</Text>
             <Text style={[styles.totalValue, { color: Colors.brand.accentGreen }]}>
-              {receipt.totalCostCzk.toFixed(2)} CZK
+              {format(receipt.totalCostCzk, { decimals: 2 })}
             </Text>
           </View>
         </View>

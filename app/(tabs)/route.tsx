@@ -21,6 +21,7 @@ import * as Location from 'expo-location';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useVehicle } from '../../context/VehicleContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -35,6 +36,7 @@ export default function RouteScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { settings, activeVehicle } = useVehicle();
+  const { format } = useCurrency();
 
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
@@ -362,7 +364,7 @@ export default function RouteScreen() {
                 <View style={styles.summaryItem}>
                   <Ionicons name="wallet" size={24} color="#F59E0B" />
                   <Text style={[styles.summaryValue, { color: colors.text }]}>
-                    {routeResult.totalCost} Kč
+                    {format(routeResult.totalCost)}
                   </Text>
                   <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>
                     {t.route.estimatedCost}
@@ -463,7 +465,7 @@ export default function RouteScreen() {
                         {t.route.estimatedPrice}:
                       </Text>
                       <Text style={[styles.stopCostValue, { color: Colors.brand.accentGreen }]}>
-                        {stop.chargeCost} Kč
+                        {format(stop.chargeCost)}
                       </Text>
                     </View>
 

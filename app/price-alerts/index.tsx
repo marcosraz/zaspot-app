@@ -7,12 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchPriceAlerts, createPriceAlert, deletePriceAlert, PriceAlert } from '../../lib/v2Features';
 
 export default function PriceAlertsScreen() {
   const { colors } = useTheme();
+  const { format } = useCurrency();
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [threshold, setThreshold] = useState('5.0');
@@ -47,7 +49,7 @@ export default function PriceAlertsScreen() {
   };
 
   const onDelete = (a: PriceAlert) => {
-    Alert.alert('Smazat alert?', `${a.direction} ${a.threshold_czk_kwh} Kč/kWh`, [
+    Alert.alert('Smazat alert?', `${a.direction} ${format(a.threshold_czk_kwh, { perKwh: true })}`, [
       { text: 'Zrušit', style: 'cancel' },
       { text: 'Smazat', style: 'destructive', onPress: () => deletePriceAlert(a.id).then(load) },
     ]);
@@ -90,7 +92,7 @@ export default function PriceAlertsScreen() {
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.alertLabel, { color: colors.text }]}>
-                    {a.direction === 'below' ? 'Když cena pod' : 'Když cena nad'} {a.threshold_czk_kwh.toFixed(2)} Kč/kWh
+                    {a.direction === 'below' ? 'Když cena pod' : 'Když cena nad'} {format(a.threshold_czk_kwh, { perKwh: true })}
                   </Text>
                   <Text style={[styles.alertSub, { color: colors.textMuted }]}>
                     via {a.notify_via}

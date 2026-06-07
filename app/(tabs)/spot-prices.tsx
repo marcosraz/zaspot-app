@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-chart-kit';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { useNotifications } from '../../context/NotificationsContext';
@@ -36,6 +37,7 @@ export default function SpotPricesScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { checkPriceAndNotify } = useNotifications();
+  const { format, symbol } = useCurrency();
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -218,7 +220,7 @@ export default function SpotPricesScreen() {
             onPress={() => setUnit('kwh')}
           >
             <Text style={{ color: unit === 'kwh' ? '#FFFFFF' : colors.text, fontWeight: '600' }}>
-              CZK/kWh
+              {`${symbol}/kWh`}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -229,7 +231,7 @@ export default function SpotPricesScreen() {
             onPress={() => setUnit('mwh')}
           >
             <Text style={{ color: unit === 'mwh' ? '#FFFFFF' : colors.text, fontWeight: '600' }}>
-              CZK/MWh
+              {`${symbol}/MWh`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -247,10 +249,10 @@ export default function SpotPricesScreen() {
           </View>
           <View style={styles.currentPriceRow}>
             <Text style={[styles.currentPriceValue, { color: getPriceColor(stats.current) }]}>
-              {displayStats.current.toFixed(2)}
+              {format(displayStats.current, { symbol: false, decimals: 2 })}
             </Text>
             <Text style={[styles.currentPriceUnit, { color: colors.textSecondary }]}>
-              {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
+              {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
             </Text>
           </View>
           <Text style={[styles.currentSlot, { color: colors.textMuted }]}>
@@ -344,7 +346,7 @@ export default function SpotPricesScreen() {
                     { color: barColor },
                     isCurrent && { fontWeight: '700' },
                   ]}>
-                    {(unit === 'kwh' ? p.priceKwh : p.price).toFixed(2)}
+                    {format(unit === 'kwh' ? p.priceKwh : p.price, { symbol: false, decimals: 2 })}
                   </Text>
                 </View>
               );
@@ -357,7 +359,7 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-down" size={24} color={Colors.spotPrice.veryLow} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.veryLow }]}>
-              {displayStats.lowest.toFixed(2)}
+              {format(displayStats.lowest, { symbol: false, decimals: 2 })}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.lowest}
@@ -370,7 +372,7 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="analytics" size={24} color="#3B82F6" />
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {displayStats.average.toFixed(2)}
+              {format(displayStats.average, { symbol: false, decimals: 2 })}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.average}
@@ -380,7 +382,7 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-up" size={24} color={Colors.spotPrice.high} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.high }]}>
-              {displayStats.highest.toFixed(2)}
+              {format(displayStats.highest, { symbol: false, decimals: 2 })}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.highest}
@@ -416,11 +418,11 @@ export default function SpotPricesScreen() {
                 {t.spotPrices.bestTime}: {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
               </Text>
               <Text style={[styles.bestTimePrice, { color: recColor }]}>
-                {displayStats.lowest.toFixed(2)} {unit === 'mwh' ? t.spotPrices.perMwh : t.spotPrices.perKwh}
+                {format(displayStats.lowest, { symbol: false, decimals: 2 })} {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
               </Text>
               {saving > 0 && (
                 <Text style={[styles.savingText, { color: colors.textSecondary }]}>
-                  {t.spotPrices.savingPotential}: {displaySaving.toFixed(2)} {unit === 'mwh' ? 'CZK/MWh' : 'CZK/kWh'}
+                  {t.spotPrices.savingPotential}: {format(displaySaving, { symbol: false, decimals: 2 })} {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
                 </Text>
               )}
             </View>

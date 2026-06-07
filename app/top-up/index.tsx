@@ -23,6 +23,7 @@ import { Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredit } from '../../context/CreditContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -41,7 +42,8 @@ type Tab = 'card' | 'transfer';
 
 export default function TopUpScreen() {
   const { colors } = useTheme();
-  const { balanceFormatted, topUp, refreshBalance } = useCredit();
+  const { balance, topUp, refreshBalance } = useCredit();
+  const { format } = useCurrency();
 
   const [tab, setTab] = useState<Tab>('card');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(500);
@@ -173,7 +175,7 @@ export default function TopUpScreen() {
           {/* Balance card */}
           <View style={[styles.balanceCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
             <Text style={[styles.balanceLabel, { color: colors.textMuted }]}>Aktuální zůstatek</Text>
-            <Text style={[styles.balanceValue, { color: Colors.brand.accentGreen }]}>{balanceFormatted}</Text>
+            <Text style={[styles.balanceValue, { color: Colors.brand.accentGreen }]}>{format(balance, { decimals: 2 })}</Text>
           </View>
 
           {/* Tab switcher */}

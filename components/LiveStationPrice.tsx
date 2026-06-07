@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Text, View, StyleSheet } from 'react-native';
 import { API_BASE } from '../lib/api';
 import { Colors } from '../constants/colors';
+import { useCurrency } from '../context/CurrencyContext';
 
 interface Props {
   /** OCPP charge_point_id, e.g. "CZ-ZAS-E00018". Pass ChargingStation.external_id. */
@@ -38,6 +39,7 @@ export function LiveStationPrice({
 }: Props) {
   const [result, setResult] = useState<PriceResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const { format } = useCurrency();
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +84,7 @@ export function LiveStationPrice({
   }
   return (
     <Text style={[styles.value, { color: valueColor }]}>
-      {result.pricePerKwh.toFixed(2)}
+      {format(result.pricePerKwh, { symbol: false, decimals: 2 })}
     </Text>
   );
 }

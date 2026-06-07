@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { useAuth } from '../../context/AuthContext';
 import { useCredit } from '../../context/CreditContext';
 import { useVehicle, POPULAR_VEHICLES, VehicleProfile } from '../../context/VehicleContext';
@@ -79,8 +80,9 @@ function MenuItem({ icon, label, value, onPress, showArrow = true, rightElement,
 export default function ProfileScreen() {
   const { colors, isDark, toggleTheme, setTheme } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLanguage();
+  const { currency, toggleCurrency, format } = useCurrency();
   const { user, isAuthenticated, logout } = useAuth();
-  const { balance, balanceFormatted, loading: creditLoading, topUp, refreshBalance } = useCredit();
+  const { balance, loading: creditLoading, topUp, refreshBalance } = useCredit();
   const { settings, setSelectedVehicle } = useVehicle();
   const {
     settings: notificationSettings,
@@ -283,7 +285,7 @@ export default function ProfileScreen() {
                 {t.profile.credit}
               </Text>
               <Text style={[styles.creditAmount, { color: colors.text }]}>
-                {creditLoading ? '...' : balanceFormatted}
+                {creditLoading ? '...' : format(balance)}
               </Text>
             </View>
             <TouchableOpacity
@@ -362,6 +364,17 @@ export default function ProfileScreen() {
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
+            {/* Currency Toggle (CZK / EUR) — display only, billing stays CZK */}
+            <MenuItem
+              icon="cash-outline"
+              label={language === 'de' ? 'Währung' : language === 'cz' ? 'Měna' : language === 'pl' ? 'Waluta' : 'Currency'}
+              value={currency === 'eur' ? 'EUR (€)' : 'CZK (Kč)'}
+              onPress={toggleCurrency}
+              iconColor={Colors.brand.accentGreen}
+            />
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
             {/* Notifications */}
             <MenuItem
               icon="notifications"
@@ -406,7 +419,7 @@ export default function ProfileScreen() {
                           <Ionicons name="remove" size={18} color={colors.text} />
                         </TouchableOpacity>
                         <Text style={[styles.priceAlertAmount, { color: Colors.brand.accentGreen }]}>
-                          {alert.thresholdKwh.toFixed(1)} Kč/kWh
+                          {format(alert.thresholdKwh, { perKwh: true })}
                         </Text>
                         <TouchableOpacity
                           onPress={() => updatePriceAlert(alert.id, {

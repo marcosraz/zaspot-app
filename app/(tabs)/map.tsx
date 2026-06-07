@@ -23,6 +23,7 @@ import { router } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useFavorites } from '../../context/FavoritesContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { ChargingStation } from '../../lib/stations';
@@ -44,6 +45,7 @@ export default function MapScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { isFavorite } = useFavorites();
+  const { symbol } = useCurrency();
   // Legacy ref slot (former native MapView). The WebView has its own ref.
   const mapRef = useRef<unknown>(null);
   void mapRef;
@@ -578,7 +580,7 @@ export default function MapScreen() {
                 textColor={colors.text}
                 labelColor={colors.textMuted}
               />
-              <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>Kč/kWh</Text>
+              <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{`${symbol}/kWh`}</Text>
             </View>
 
             <View style={[styles.statBox, { backgroundColor: isDark ? colors.surfaceSecondary : '#F9FAFB' }]}>

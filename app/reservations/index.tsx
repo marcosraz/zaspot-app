@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { getLocale } from '../../constants/translations';
@@ -30,6 +31,7 @@ export default function ReservationsScreen() {
   const { colors } = useTheme();
   const { language, t } = useLanguage();
   const { isAuthenticated } = useAuth();
+  const { format } = useCurrency();
   const { scheduleReservationReminder, cancelReservationReminder } = useNotifications();
 
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -170,7 +172,7 @@ export default function ReservationsScreen() {
 
         {res.deposit_czk > 0 && (
           <Text style={[styles.resDeposit, { color: colors.textMuted }]}>
-            {t.reservations.deposit}: {res.deposit_czk} CZK
+            {t.reservations.deposit}: {format(res.deposit_czk)}
           </Text>
         )}
 

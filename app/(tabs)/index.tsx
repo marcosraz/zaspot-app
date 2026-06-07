@@ -20,11 +20,12 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useNotifications } from '../../context/NotificationsContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchSpotPrices, getCurrentSlot, getPriceColor, DailyPrices } from '../../lib/spotPrices';
 import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../lib/stations';
-import { fetchEffectivePrices, EffectivePrices, formatPrice } from '../../lib/pricing';
+import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 import FavoriteButton from '../../components/FavoriteButton';
 import ActiveChargingWidget from '../../components/ActiveChargingWidget';
 
@@ -40,6 +41,7 @@ export default function HomeScreen() {
   const { t } = useLanguage();
   const { favorites, isLoaded: favoritesLoaded } = useFavorites();
   const { checkPriceAndNotify } = useNotifications();
+  const { format, symbol } = useCurrency();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -224,10 +226,10 @@ export default function HomeScreen() {
 
           <View style={styles.priceMain}>
             <Text style={[styles.priceValue, { color: getPriceColor(currentPrice) }]}>
-              {currentPrice.toFixed(2)}
+              {format(currentPrice, { symbol: false, decimals: 2 })}
             </Text>
             <Text style={[styles.priceUnit, { color: colors.textSecondary }]}>
-              {t.home.perKwh}
+              {`${symbol}/kWh`}
             </Text>
           </View>
 
@@ -237,16 +239,16 @@ export default function HomeScreen() {
               <View style={[styles.effectivePriceBox, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
                 <Text style={[styles.effectivePriceLabel, { color: colors.textSecondary }]}>AC</Text>
                 <Text style={[styles.effectivePriceValue, { color: Colors.brand.accentGreen }]}>
-                  {formatPrice(effectivePrices.acPrice)}
+                  {format(effectivePrices.acPrice, { symbol: false, decimals: 2 })}
                 </Text>
-                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>CZK/kWh</Text>
+                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>{`${symbol}/kWh`}</Text>
               </View>
               <View style={[styles.effectivePriceBox, { backgroundColor: '#EF4444' + '12' }]}>
                 <Text style={[styles.effectivePriceLabel, { color: colors.textSecondary }]}>DC</Text>
                 <Text style={[styles.effectivePriceValue, { color: '#EF4444' }]}>
-                  {formatPrice(effectivePrices.dcPrice)}
+                  {format(effectivePrices.dcPrice, { symbol: false, decimals: 2 })}
                 </Text>
-                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>CZK/kWh</Text>
+                <Text style={[styles.effectivePriceUnit, { color: colors.textMuted }]}>{`${symbol}/kWh`}</Text>
               </View>
             </View>
           )}
@@ -257,7 +259,7 @@ export default function HomeScreen() {
                 {t.spotPrices.lowest}
               </Text>
               <Text style={[styles.statValue, { color: Colors.spotPrice.veryLow }]}>
-                {(priceData?.stats.lowest || 0).toFixed(2)}
+                {format(priceData?.stats.lowest ?? 0, { symbol: false, decimals: 2 })}
               </Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -266,7 +268,7 @@ export default function HomeScreen() {
                 {t.spotPrices.average}
               </Text>
               <Text style={[styles.statValue, { color: colors.text }]}>
-                {(priceData?.stats.average || 0).toFixed(2)}
+                {format(priceData?.stats.average ?? 0, { symbol: false, decimals: 2 })}
               </Text>
             </View>
             <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
@@ -275,7 +277,7 @@ export default function HomeScreen() {
                 {t.spotPrices.highest}
               </Text>
               <Text style={[styles.statValue, { color: Colors.spotPrice.high }]}>
-                {(priceData?.stats.highest || 0).toFixed(2)}
+                {format(priceData?.stats.highest ?? 0, { symbol: false, decimals: 2 })}
               </Text>
             </View>
           </View>

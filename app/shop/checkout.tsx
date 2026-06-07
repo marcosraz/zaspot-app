@@ -10,6 +10,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../../context/ThemeContext';
 import { useShop } from '../../context/ShopContext';
 import { useCredit } from '../../context/CreditContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
@@ -19,8 +20,9 @@ export default function CheckoutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { cart, total, updateQuantity, removeFromCart, clearCart } = useShop();
-  const { balance, balanceFormatted } = useCredit();
+  const { balance } = useCredit();
   const { isAuthenticated } = useAuth();
+  const { format } = useCurrency();
   const [address, setAddress] = useState('');
   const [method, setMethod] = useState<'card' | 'wallet'>('card');
   const [submitting, setSubmitting] = useState(false);
@@ -89,7 +91,7 @@ export default function CheckoutScreen() {
             <View key={item.product.id} style={[styles.cartItem, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={2}>{item.product.name}</Text>
-                <Text style={[styles.itemPrice, { color: Colors.brand.accentGreen }]}>{item.product.price_czk.toFixed(0)} Kč</Text>
+                <Text style={[styles.itemPrice, { color: Colors.brand.accentGreen }]}>{format(item.product.price_czk, { decimals: 0 })}</Text>
               </View>
               <View style={styles.qtyControls}>
                 <TouchableOpacity onPress={() => updateQuantity(item.product.id, item.quantity - 1)} style={[styles.qtyBtn, { borderColor: colors.border }]}>
@@ -127,8 +129,8 @@ export default function CheckoutScreen() {
           />
           <PaymentOption
             icon="wallet"
-            label={`Peněženka · ${balanceFormatted}`}
-            sub={`Sleva 5% · konečně ${finalTotal.toFixed(0)} Kč`}
+            label={`Peněženka · ${format(balance, { decimals: 2 })}`}
+            sub={`Sleva 5% · konečně ${format(finalTotal, { decimals: 0 })}`}
             selected={method === 'wallet'}
             onPress={() => setMethod('wallet')}
             colors={colors}
@@ -136,11 +138,11 @@ export default function CheckoutScreen() {
           />
 
           <View style={[styles.summary, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Row label="Mezisoučet" value={`${total.toFixed(0)} Kč`} colors={colors} />
+            <Row label="Mezisoučet" value={format(total, { decimals: 0 })} colors={colors} />
             {walletDiscount > 0 && (
-              <Row label="Sleva (5%)" value={`-${walletDiscount.toFixed(0)} Kč`} colors={colors} highlight />
+              <Row label="Sleva (5%)" value={`-${format(walletDiscount, { decimals: 0 })}`} colors={colors} highlight />
             )}
-            <Row label="Celkem" value={`${finalTotal.toFixed(0)} Kč`} colors={colors} bold />
+            <Row label="Celkem" value={format(finalTotal, { decimals: 0 })} colors={colors} bold />
           </View>
 
           <TouchableOpacity
@@ -154,7 +156,7 @@ export default function CheckoutScreen() {
             {submitting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.checkoutText}>Dokončit objednávku · {finalTotal.toFixed(0)} Kč</Text>
+              <Text style={styles.checkoutText}>Dokončit objednávku · {format(finalTotal, { decimals: 0 })}</Text>
             )}
           </TouchableOpacity>
         </ScrollView>

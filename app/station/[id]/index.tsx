@@ -24,6 +24,7 @@ import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useFavorites } from '../../../context/FavoritesContext';
 import { useNotifications } from '../../../context/NotificationsContext';
+import { useCurrency } from '../../../context/CurrencyContext';
 import { Colors } from '../../../constants/colors';
 import { Layout } from '../../../constants/layout';
 import { getLocale } from '../../../constants/translations';
@@ -39,7 +40,7 @@ import {
   formatDuration,
   formatEnergy,
 } from '../../../lib/charging';
-import { fetchEffectivePrices, EffectivePrices, formatPrice } from '../../../lib/pricing';
+import { fetchEffectivePrices, EffectivePrices } from '../../../lib/pricing';
 import { createReservation } from '../../../lib/reservations';
 import { openNavigationTo } from '../../../lib/navigation';
 
@@ -52,6 +53,7 @@ export default function StationDetailScreen() {
   const { isAuthenticated } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { notifyChargingStarted, notifyChargingComplete } = useNotifications();
+  const { format, code } = useCurrency();
 
   const l = t.station;
 
@@ -182,7 +184,7 @@ export default function StationDetailScreen() {
     });
 
     const depositText = station.reservationDepositCzk
-      ? `\n${l.reserveDeposit}: ${station.reservationDepositCzk} CZK`
+      ? `\n${l.reserveDeposit}: ${format(station.reservationDepositCzk)}`
       : '';
 
     Alert.alert(
@@ -357,10 +359,10 @@ export default function StationDetailScreen() {
                   {l.acPrice}
                 </Text>
                 <Text style={[styles.priceBoxValue, { color: Colors.brand.accentGreen }]}>
-                  {formatPrice(prices.acPrice)}
+                  {format(prices.acPrice, { symbol: false, decimals: 2 })}
                 </Text>
                 <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
-                  {l.perKwh}
+                  {code}/kWh
                 </Text>
               </View>
               <View style={[styles.priceBox, { backgroundColor: '#EF4444' + '12' }]}>
@@ -368,17 +370,17 @@ export default function StationDetailScreen() {
                   {l.dcPrice}
                 </Text>
                 <Text style={[styles.priceBoxValue, { color: '#EF4444' }]}>
-                  {formatPrice(prices.dcPrice)}
+                  {format(prices.dcPrice, { symbol: false, decimals: 2 })}
                 </Text>
                 <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
-                  {l.perKwh}
+                  {code}/kWh
                 </Text>
               </View>
             </View>
 
             <View style={[styles.spotPriceRow, { borderTopColor: colors.border }]}>
               <Text style={[styles.spotPriceLabel, { color: colors.textMuted }]}>
-                {l.spotPrice}: {formatPrice(prices.spotPrice)} CZK/kWh
+                {l.spotPrice}: {format(prices.spotPrice, { perKwh: true })}
               </Text>
             </View>
           </View>
@@ -480,7 +482,7 @@ export default function StationDetailScreen() {
                     <View style={[styles.costRow, { borderTopColor: colors.border }]}>
                       <Text style={[styles.costLabel, { color: colors.textSecondary }]}>{l.cost}</Text>
                       <Text style={[styles.costValue, { color: colors.text }]}>
-                        {activeSession.totalCostCzk.toFixed(2)} CZK
+                        {format(activeSession.totalCostCzk, { decimals: 2 })}
                       </Text>
                     </View>
                   )}
