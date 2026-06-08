@@ -43,7 +43,8 @@ type Tab = 'card' | 'transfer';
 export default function TopUpScreen() {
   const { colors } = useTheme();
   const { balance, topUp, refreshBalance } = useCredit();
-  const { format } = useCurrency();
+  const { format, currency } = useCurrency();
+  const isEur = currency === 'eur';
 
   const [tab, setTab] = useState<Tab>('card');
   const [selectedPreset, setSelectedPreset] = useState<number | null>(500);
@@ -77,6 +78,15 @@ export default function TopUpScreen() {
     if (tab === 'transfer') reloadPending();
   }, [tab, reloadPending]);
 
+  // EUR top-up is bank-transfer only (SEPA). Switch to it and pick a EUR preset.
+  useEffect(() => {
+    if (isEur) {
+      setTab('transfer');
+      setSelectedPreset(20);
+      setCustomAmount('');
+    }
+  }, [isEur]);
+
   const handleCard = async () => {
     const amount = getAmount();
     if (!amount || amount < MIN_AMOUNT) {
@@ -99,16 +109,18 @@ export default function TopUpScreen() {
 
   const handleTransferGenerate = async () => {
     const amount = getAmount();
-    if (!amount || amount < MIN_AMOUNT) {
-      Alert.alert('Minimální částka', `Minimum ${MIN_AMOUNT} Kč`);
+    const minA = isEur ? 2 : MIN_AMOUNT;
+    const maxA = isEur ? 400 : MAX_AMOUNT;
+    if (!amount || amount < minA) {
+      Alert.alert('Minimální částka', isEur ? `Minimum ${minA} €` : `Minimum ${minA} Kč`);
       return;
     }
-    if (amount > MAX_AMOUNT) {
-      Alert.alert('Maximální částka', `Maximum ${MAX_AMOUNT} Kč`);
+    if (amount > maxA) {
+      Alert.alert('Maximální částka', isEur ? `Maximum ${maxA} €` : `Maximum ${maxA} Kč`);
       return;
     }
     setSubmitting(true);
-    const res = await requestBankTransfer(amount);
+    const res = await requestBankTransfer(amount, isEur ? 'EUR' : 'CZK');
     setSubmitting(false);
     if (res.ok && res.data.success && res.data.transfer) {
       setBankResult(res.data.transfer);
@@ -180,7 +192,7 @@ export default function TopUpScreen() {
 
           {/* Tab switcher */}
           <View style={[styles.tabBar, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <TabBtn label="Karta" icon="card" active={tab === 'card'} onPress={() => { setTab('card'); }} colors={colors} />
+            {!isEur && <TabBtn label="Karta" icon="card" active={tab === 'card'} onPress={() => { setTab('card'); }} colors={colors} />}
             <TabBtn label="Bank. převod" icon="business" active={tab === 'transfer'} onPress={() => setTab('transfer')} colors={colors} />
           </View>
 
@@ -239,8 +251,12 @@ export default function TopUpScreen() {
 
               <CopyRow label="IBAN" value={bankResult.iban} fieldKey="iban" copiedKey={copiedKey} onCopy={copy} colors={colors} />
               <CopyRow label="BIC/SWIFT" value={bankResult.bic} fieldKey="bic" copiedKey={copiedKey} onCopy={copy} colors={colors} />
-              <CopyRow label="Variabilní symbol" value={bankResult.variable_symbol} fieldKey="vs" copiedKey={copiedKey} onCopy={copy} colors={colors} highlight />
-              <CopyRow label="Částka" value={`${bankResult.amount_czk} CZK`} fieldKey="amount" copiedKey={copiedKey} onCopy={copy} colors={colors} highlight />
+              {bankResult.currency === 'EUR' ? (
+                <CopyRow label="Verwendungszweck / Reference" value={bankResult.reference ?? ''} fieldKey="vs" copiedKey={copiedKey} onCopy={copy} colors={colors} highlight />
+              ) : (
+                <CopyRow label="Variabilní symbol" value={bankResult.variable_symbol} fieldKey="vs" copiedKey={copiedKey} onCopy={copy} colors={colors} highlight />
+              )}
+              <CopyRow label="Částka" value={bankResult.currency === 'EUR' ? `${bankResult.amount_eur} EUR` : `${bankResult.amount_czk} CZK`} fieldKey="amount" copiedKey={copiedKey} onCopy={copy} colors={colors} highlight />
               <CopyRow label="Příjemce" value={bankResult.recipient} fieldKey="recipient" copiedKey={copiedKey} onCopy={copy} colors={colors} />
 
               <View style={[styles.infoBox, { backgroundColor: '#3B82F615', borderColor: '#3B82F640' }]}>
@@ -303,7 +319,8 @@ export default function TopUpScreen() {
               )}
 
               <AmountSelector
-                presets={PRESETS}
+                presets={isEur ? [5, 10, 20, 50] : PRESETS}
+                eur={isEur}
                 selectedPreset={selectedPreset}
                 customAmount={customAmount}
                 setSelectedPreset={(p) => { setSelectedPreset(p); setCustomAmount(''); }}
@@ -354,8 +371,9 @@ function TabBtn({ label, icon, active, onPress, colors }: {
   );
 }
 
-function AmountSelector({ presets, selectedPreset, customAmount, setSelectedPreset, setCustomAmount, colors, disabled }: {
+function AmountSelector({ presets, eur, selectedPreset, customAmount, setSelectedPreset, setCustomAmount, colors, disabled }: {
   presets: number[];
+  eur?: boolean;
   selectedPreset: number | null;
   customAmount: string;
   setSelectedPreset: (p: number) => void;
@@ -381,7 +399,7 @@ function AmountSelector({ presets, selectedPreset, customAmount, setSelectedPres
             ]}
           >
             <Text style={{ color: selectedPreset === p ? '#fff' : colors.text, fontWeight: '700' }}>
-              {p} Kč
+              {eur ? `€${p}` : `${p} Kč`}
             </Text>
           </TouchableOpacity>
         ))}
@@ -392,13 +410,13 @@ function AmountSelector({ presets, selectedPreset, customAmount, setSelectedPres
         value={customAmount}
         onChangeText={setCustomAmount}
         keyboardType="numeric"
-        placeholder={`${MIN_AMOUNT}–${MAX_AMOUNT}`}
+        placeholder={eur ? '2–400' : `${MIN_AMOUNT}–${MAX_AMOUNT}`}
         placeholderTextColor={colors.textMuted}
         editable={!disabled}
         style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
       />
       <Text style={{ color: colors.textMuted, fontSize: 11 }}>
-        Min. {MIN_AMOUNT} Kč • Max. {MAX_AMOUNT} Kč
+        {eur ? 'Min. 2 € • Max. 400 €' : `Min. ${MIN_AMOUNT} Kč • Max. ${MAX_AMOUNT} Kč`}
       </Text>
     </>
   );

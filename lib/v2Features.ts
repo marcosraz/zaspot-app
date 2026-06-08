@@ -184,6 +184,9 @@ export interface BankTransferInfo {
   recipient: string;
   variable_symbol: string;
   amount_czk: number;
+  currency?: 'CZK' | 'EUR';
+  amount_eur?: number;
+  reference?: string;
   spd_string?: string;
   qr_data_url?: string;
   expires_at?: string;
@@ -219,13 +222,15 @@ export async function cancelBankTransfer(id: string) {
 
 // Backend endpoint is /payment/bank-transfer/create (not /payment/bank-transfer).
 // Response shape is flat — fields live at the top level, not under .transfer.
-export async function requestBankTransfer(amountCzk: number) {
+export async function requestBankTransfer(amount: number, currency: 'CZK' | 'EUR' = 'CZK') {
   const res = await apiFetch<
     | (BankTransferInfo & { success: true; id: string })
     | { success: false; error?: string }
   >('/payment/bank-transfer/create', {
     method: 'POST',
-    body: JSON.stringify({ amount_czk: amountCzk }),
+    body: JSON.stringify(
+      currency === 'EUR' ? { currency: 'EUR', amount_eur: amount } : { amount_czk: amount }
+    ),
     requireAuth: true,
   });
 
