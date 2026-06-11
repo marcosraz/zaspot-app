@@ -15,10 +15,12 @@ import {
   TouchableOpacity,
   Modal,
 } from 'react-native';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import * as Location from 'expo-location';
+import PressableScale from '../../components/ui/PressableScale';
 import { useTheme } from '../../context/ThemeContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
@@ -148,7 +150,10 @@ export default function EmpStationsScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           {/* Active session banner */}
           {session && (
-            <View style={[styles.sessionBanner, { backgroundColor: Colors.brand.accentGreen }]}>
+            <Animated.View
+              entering={FadeInUp.springify().damping(15)}
+              style={[styles.sessionBanner, { backgroundColor: Colors.brand.accentGreen }]}
+            >
               <View style={styles.sessionHeader}>
                 <View style={styles.sessionPulse}>
                   <Ionicons name="flash" size={18} color="#fff" />
@@ -177,7 +182,7 @@ export default function EmpStationsScreen() {
                   </>
                 )}
               </TouchableOpacity>
-            </View>
+            </Animated.View>
           )}
 
           <View style={[styles.infoCard, { backgroundColor: Colors.brand.accentGreen + '15', borderColor: Colors.brand.accentGreen }]}>
@@ -190,11 +195,14 @@ export default function EmpStationsScreen() {
 
           {error && <Text style={{ color: colors.error, padding: 14 }}>{error}</Text>}
 
-          {stations.map((s) => {
+          {stations.map((s, idx) => {
             const startable = s.status === 'available' && !session;
             return (
-              <TouchableOpacity
+              <Animated.View
                 key={s.evse_id}
+                entering={FadeInDown.delay(Math.min(idx, 8) * 50).springify().damping(16)}
+              >
+              <PressableScale
                 style={[styles.stationCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
                 onPress={() => {
                   if (startable) {
@@ -202,7 +210,8 @@ export default function EmpStationsScreen() {
                     setSelected(s);
                   }
                 }}
-                activeOpacity={startable ? 0.7 : 1}
+                scaleTo={startable ? 0.97 : 1}
+                haptic={startable}
               >
                 <View style={styles.headerRow}>
                   <View style={{ flex: 1 }}>
@@ -229,7 +238,8 @@ export default function EmpStationsScreen() {
                     </Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
+              </Animated.View>
             );
           })}
         </ScrollView>
@@ -278,11 +288,11 @@ export default function EmpStationsScreen() {
                 </View>
               )}
 
-              <TouchableOpacity
+              <PressableScale
                 style={[styles.primaryButton, { backgroundColor: Colors.brand.accentGreen, opacity: starting ? 0.7 : 1 }]}
                 onPress={handleStart}
                 disabled={starting}
-                activeOpacity={0.8}
+                scaleTo={0.96}
               >
                 {starting ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -292,7 +302,7 @@ export default function EmpStationsScreen() {
                     <Text style={styles.primaryButtonText}>Zahájit nabíjení</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
 
               <TouchableOpacity
                 style={styles.cancelButton}

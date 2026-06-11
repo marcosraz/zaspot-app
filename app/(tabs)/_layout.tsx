@@ -4,8 +4,14 @@
  */
 
 import { Tabs } from 'expo-router';
-import { Platform, StyleSheet, View } from 'react-native';
+import { useEffect } from 'react';
+import { Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
@@ -19,15 +25,36 @@ interface TabIconProps {
   focused: boolean;
 }
 
+// Active tab: a green pill springs in behind the icon and the icon pops up
+// slightly — one shared `progress` value drives both so they stay in sync.
 function TabIcon({ name, color, focused }: TabIconProps) {
+  const progress = useSharedValue(focused ? 1 : 0);
+
+  useEffect(() => {
+    progress.value = withSpring(focused ? 1 : 0, { damping: 14, stiffness: 220 });
+  }, [focused, progress]);
+
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity: progress.value,
+    transform: [{ scaleX: 0.6 + progress.value * 0.4 }],
+  }));
+
+  const iconStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: 1 + progress.value * 0.12 },
+      { translateY: -progress.value * 1.5 },
+    ],
+  }));
+
   return (
-    <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
+    <Animated.View style={[styles.iconContainer, iconStyle]}>
+      <Animated.View style={[styles.pill, pillStyle]} />
       <Ionicons
         name={name}
         size={24}
         color={focused ? Colors.brand.accentGreen : color}
       />
-    </View>
+    </Animated.View>
   );
 }
 
@@ -130,10 +157,14 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 40,
-    height: 28,
+    width: 52,
+    height: 30,
   },
-  iconContainerFocused: {
-    // Optional: Add subtle highlight effect
+  pill: {
+    position: 'absolute',
+    width: 52,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: Colors.brand.accentGreen + '1A',
   },
 });

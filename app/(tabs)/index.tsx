@@ -10,8 +10,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  ActivityIndicator,
 } from 'react-native';
+import Animated, { FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -29,6 +29,8 @@ import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 import FavoriteButton from '../../components/FavoriteButton';
 import ActiveChargingWidget from '../../components/ActiveChargingWidget';
 import PriceSheet from '../../components/PriceSheet';
+import PressableScale from '../../components/ui/PressableScale';
+import Skeleton from '../../components/ui/Skeleton';
 
 interface QuickAction {
   icon: keyof typeof Ionicons.glyphMap;
@@ -166,10 +168,28 @@ export default function HomeScreen() {
   };
 
   if (loading) {
+    // Content-shaped skeleton: mirrors header + price card + quick-actions grid
+    // so the screen doesn't "jump" when real data replaces it.
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.brand.accentGreen} />
+        <View style={styles.scrollContent}>
+          <View style={[styles.header, { marginBottom: Layout.spacing.md }]}>
+            <View style={{ gap: 8 }}>
+              <Skeleton width={90} height={14} />
+              <Skeleton width={140} height={28} />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <Skeleton width={44} height={44} borderRadius={22} />
+              <Skeleton width={44} height={44} borderRadius={22} />
+            </View>
+          </View>
+          <Skeleton height={170} borderRadius={16} style={{ marginBottom: Layout.spacing.lg }} />
+          <Skeleton height={220} borderRadius={16} style={{ marginBottom: Layout.spacing.lg }} />
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Layout.spacing.md }}>
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} width="47%" height={104} borderRadius={16} />
+            ))}
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -200,22 +220,22 @@ export default function HomeScreen() {
           <View style={styles.headerActions}>
             {/* QR scan — primary action for a charging app, available right on the
                 home screen (previously only reachable from the map tab). */}
-            <TouchableOpacity
+            <PressableScale
               style={[styles.themeToggle, { backgroundColor: Colors.brand.accentGreen }]}
               onPress={() => router.push('/scan')}
-              accessibilityRole="button"
+              scaleTo={0.88}
               accessibilityLabel="Skenovat QR kód stanice"
             >
               <Ionicons name="qr-code-outline" size={22} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity
+            </PressableScale>
+            <PressableScale
               style={[styles.themeToggle, { backgroundColor: colors.surface }]}
               onPress={() => router.push('/profile')}
-              accessibilityRole="button"
+              scaleTo={0.88}
               accessibilityLabel={t.tabs.profile}
             >
               <Ionicons name="settings-outline" size={24} color={colors.text} />
-            </TouchableOpacity>
+            </PressableScale>
           </View>
         </View>
 
@@ -225,6 +245,7 @@ export default function HomeScreen() {
         {/* Pricing — Spot vs ZAfix split (mirrors the zaspot.cz homepage sheet).
             Needs the effective-prices payload (carries the ZAfix fields); while it
             loads we show a slim spot-only fallback so the screen never looks empty. */}
+        <Animated.View entering={FadeInDown.delay(60).springify().damping(16)}>
         {effectivePrices ? (
           <PriceSheet
             prices={effectivePrices}
@@ -257,9 +278,13 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+        </Animated.View>
 
         {/* Daily spot stats (low / avg / high) + best-time-to-charge CTA */}
-        <View style={[styles.statsCard, { backgroundColor: colors.surface }]}>
+        <Animated.View
+          entering={FadeInDown.delay(140).springify().damping(16)}
+          style={[styles.statsCard, { backgroundColor: colors.surface }]}
+        >
           <View style={styles.statsHeader}>
             <Text style={[styles.statsTitle, { color: colors.text }]}>
               {t.spotPrices.title}
@@ -338,17 +363,18 @@ export default function HomeScreen() {
           </View>
 
           {/* Best Time to Charge */}
-          <TouchableOpacity
+          <PressableScale
             style={[styles.bestTimeContainer, { backgroundColor: isDark ? colors.surfaceSecondary : '#ECFDF5' }]}
             onPress={() => router.push('/spot-prices')}
+            scaleTo={0.98}
           >
             <Ionicons name="time-outline" size={20} color={Colors.brand.accentGreen} />
             <Text style={[styles.bestTimeText, { color: Colors.brand.accentGreen }]}>
               {t.spotPrices.bestTime}: {bestTime}
             </Text>
             <Ionicons name="chevron-forward" size={16} color={Colors.brand.accentGreen} />
-          </TouchableOpacity>
-        </View>
+          </PressableScale>
+        </Animated.View>
 
         {/* Quick Actions */}
         <View style={styles.sectionHeader}>
@@ -359,19 +385,24 @@ export default function HomeScreen() {
 
         <View style={styles.quickActionsGrid}>
           {quickActions.map((action, index) => (
-            <TouchableOpacity
+            <Animated.View
               key={index}
-              style={[styles.quickActionCard, { backgroundColor: colors.surface }]}
-              onPress={() => router.push(action.route as any)}
-              activeOpacity={0.7}
+              entering={FadeInDown.delay(220 + index * 60).springify().damping(16)}
+              style={styles.quickActionWrap}
             >
-              <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}20` }]}>
-                <Ionicons name={action.icon} size={28} color={action.color} />
-              </View>
-              <Text style={[styles.quickActionLabel, { color: colors.text }]}>
-                {action.label}
-              </Text>
-            </TouchableOpacity>
+              <PressableScale
+                style={[styles.quickActionCard, { backgroundColor: colors.surface }]}
+                onPress={() => router.push(action.route as any)}
+                scaleTo={0.94}
+              >
+                <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}20` }]}>
+                  <Ionicons name={action.icon} size={28} color={action.color} />
+                </View>
+                <Text style={[styles.quickActionLabel, { color: colors.text }]}>
+                  {action.label}
+                </Text>
+              </PressableScale>
+            </Animated.View>
           ))}
         </View>
 
@@ -392,9 +423,9 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.stationsList}>
-              {favoriteStations.map((station) => (
-                <TouchableOpacity
-                  key={station.id}
+              {favoriteStations.map((station, idx) => (
+                <Animated.View key={station.id} entering={FadeInDown.delay(idx * 60).springify().damping(16)}>
+                <PressableScale
                   style={[styles.stationCard, { backgroundColor: colors.surface }]}
                   onPress={() => router.push(`/station/${station.id}`)}
                 >
@@ -426,7 +457,8 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                   </View>
-                </TouchableOpacity>
+                </PressableScale>
+                </Animated.View>
               ))}
             </View>
           </>
@@ -446,9 +478,9 @@ export default function HomeScreen() {
 
         {nearbyStations.length > 0 ? (
           <View style={styles.stationsList}>
-            {nearbyStations.map((station) => (
-              <TouchableOpacity
-                key={station.id}
+            {nearbyStations.map((station, idx) => (
+              <Animated.View key={station.id} entering={FadeInDown.delay(idx * 60).springify().damping(16)}>
+              <PressableScale
                 style={[styles.stationCard, { backgroundColor: colors.surface }]}
                 onPress={() => router.push(`/station/${station.id}`)}
               >
@@ -480,7 +512,8 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </View>
-              </TouchableOpacity>
+              </PressableScale>
+              </Animated.View>
             ))}
           </View>
         ) : (
@@ -721,8 +754,11 @@ const styles = StyleSheet.create({
     gap: Layout.spacing.md,
     marginBottom: Layout.spacing.lg,
   },
-  quickActionCard: {
+  quickActionWrap: {
     width: '47%',
+  },
+  quickActionCard: {
+    width: '100%',
     padding: Layout.spacing.lg,
     borderRadius: Layout.borderRadius.xl,
     alignItems: 'center',
