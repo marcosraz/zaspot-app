@@ -42,3 +42,7 @@ yarn-error.*
 
 # Local EAS Build APK outputs
 build-*.apk
+
+# EAS signing credentials (downloaded, never commit)
+credentials.json
+credentials/
