@@ -56,7 +56,9 @@ export default function ActiveChargingWidget() {
     if (!session) return;
 
     const updateElapsed = () => {
-      const start = new Date(session.startTimestamp).getTime();
+      // Postgres returns "YYYY-MM-DD HH:MM:SS+00" (space, no 'T'); Hermes's Date
+      // parser returns NaN for that → duration showed "—". Normalize to ISO.
+      const start = new Date(session.startTimestamp.replace(' ', 'T')).getTime();
       const now = Date.now();
       const mins = (now - start) / 60_000;
       setElapsed(formatDuration(mins));
@@ -93,8 +95,14 @@ export default function ActiveChargingWidget() {
 
   if (!session) return null;
 
-  const energyKwh = session.energyKwh || 0;
-  const costCzk = session.totalCostCzk || 0;
+  // During an active session the top-level energyKwh/totalCostCzk are NULL (only
+  // set at stop). Use the live fields the server now provides: live.energyKwh and
+  // accumulatedCostCzk (the running cost, updated every MeterValue).
+  const energyKwh = session.live?.energyKwh ?? session.energyKwh ?? 0;
+  // accumulated_cost_czk / total_cost_czk are NET; display gross (× 1.21 DPH) to
+  // match the wallet deduction and every other cost surface.
+  const costCzk = (session.accumulatedCostCzk ?? session.totalCostCzk ?? 0) * 1.21;
+  const soc = session.live?.socPercent;
 
   return (
     <TouchableOpacity
@@ -139,6 +147,18 @@ export default function ActiveChargingWidget() {
           <Text style={styles.statValue}>{elapsed}</Text>
           <Text style={styles.statLabel}>doba</Text>
         </View>
+
+        {/* Battery SoC — only when the car/charger actually reports it over OCPP */}
+        {soc != null && (
+          <>
+            <View style={styles.statDivider} />
+            <View style={styles.statItem}>
+              <Ionicons name="battery-half-outline" size={16} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.statValue}>{soc}%</Text>
+              <Text style={styles.statLabel}>baterie</Text>
+            </View>
+          </>
+        )}
       </View>
     </TouchableOpacity>
   );

@@ -66,6 +66,7 @@ export interface ChargingSession {
   stopReason: string | null;
   billingStatus: string;
   totalCostCzk: number | null;
+  accumulatedCostCzk?: number | null; // live running cost (NET) while active
   avgSpotPriceCzkKwh: number | null;
   meterValues: MeterValue[];
 }
@@ -89,6 +90,9 @@ export interface UserTransaction {
   status: 'active' | 'completed';
   billingStatus: string;
   totalCostCzk: number | null;
+  // Live running cost (NET), non-null during an active session (total_cost_czk is
+  // only set at stop). Used by the active-charging card for live cost.
+  accumulatedCostCzk?: number | null;
   avgSpotPriceCzkKwh: number | null;
   live?: LiveData | null;
 }

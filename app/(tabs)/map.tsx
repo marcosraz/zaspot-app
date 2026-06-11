@@ -15,7 +15,7 @@ import {
   Linking,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -46,6 +46,7 @@ export default function MapScreen() {
   const { t } = useLanguage();
   const { isFavorite } = useFavorites();
   const { symbol } = useCurrency();
+  const insets = useSafeAreaInsets();
   // Legacy ref slot (former native MapView). The WebView has its own ref.
   const mapRef = useRef<unknown>(null);
   void mapRef;
@@ -378,92 +379,104 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* Search Bar */}
-      <SafeAreaView style={styles.searchContainer} edges={['top']}>
-        <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
-          <Ionicons name="search" size={20} color={colors.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
-            placeholder={t.map.searchPlaceholder}
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+      {/* ── Floating header: row 1 = search + filter, row 2 = network toggle + count.
+          Everything lives inside ONE SafeAreaView so the notch/status-bar inset is
+          applied a single time and the rows stack deterministically. The old layout
+          positioned the toggle (top:110) and count badge (top:115) with absolute
+          screen-top coordinates that ignored the safe-area inset, so on tall-status-bar
+          devices they collided with the search bar. `box-none` lets map gestures pass
+          through the empty gaps between controls. */}
+      <SafeAreaView edges={['top']} style={styles.headerArea} pointerEvents="box-none">
+        <View style={styles.searchRow} pointerEvents="box-none">
+          <View style={[styles.searchBar, { backgroundColor: colors.surface }]}>
+            <Ionicons name="search" size={20} color={colors.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder={t.map.searchPlaceholder}
+              placeholderTextColor={colors.textMuted}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.filterButton, { backgroundColor: colors.surface }]}
+            onPress={() => setShowFilters(true)}
+          >
+            <Ionicons name="options" size={22} color={hasActiveFilters ? Colors.brand.accentGreen : colors.text} />
+            {hasActiveFilters && <View style={styles.filterActiveDot} />}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.controlsRow} pointerEvents="box-none">
+          {/* Network Filter Toggle (matches web charging-map) */}
+          <View style={[styles.networkToggle, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity
+              style={[
+                styles.networkToggleBtn,
+                networkFilter === 'zaspot' && { backgroundColor: Colors.brand.accentGreen },
+              ]}
+              onPress={() => setNetworkFilter('zaspot')}
+            >
+              <Text
+                style={[
+                  styles.networkToggleText,
+                  { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
+                ]}
+              >
+                ZAspot ({ocppStations.length})
+              </Text>
             </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              style={[
+                styles.networkToggleBtn,
+                networkFilter === 'all' && { backgroundColor: Colors.brand.accentGreen },
+              ]}
+              onPress={() => setNetworkFilter('all')}
+            >
+              <Text
+                style={[
+                  styles.networkToggleText,
+                  { color: networkFilter === 'all' ? '#fff' : colors.text },
+                ]}
+              >
+                Vše
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Station Count Badge */}
+          <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
+            <Ionicons name="location" size={16} color={Colors.brand.accentGreen} />
+            <Text style={[styles.countText, { color: colors.text }]}>
+              {filteredStations.length} {t.map.allStations.toLowerCase()}
+            </Text>
+          </View>
         </View>
-        <TouchableOpacity
-          style={[styles.filterButton, { backgroundColor: colors.surface }]}
-          onPress={() => setShowFilters(true)}
-        >
-          <Ionicons name="options" size={22} color={hasActiveFilters ? Colors.brand.accentGreen : colors.text} />
-          {hasActiveFilters && <View style={styles.filterActiveDot} />}
-        </TouchableOpacity>
+
+        {/* Offline Indicator */}
+        {isOffline && cacheInfo && (
+          <View style={styles.offlineRow} pointerEvents="none">
+            <View style={[styles.offlineBadge, { backgroundColor: '#F59E0B' }]}>
+              <Ionicons name="cloud-offline" size={14} color="#FFFFFF" />
+              <Text style={styles.offlineText}>{cacheInfo}</Text>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
-
-      {/* Network Filter Toggle (matches web charging-map) */}
-      <View style={[styles.networkToggle, { backgroundColor: colors.surface }]}>
-        <TouchableOpacity
-          style={[
-            styles.networkToggleBtn,
-            networkFilter === 'zaspot' && { backgroundColor: Colors.brand.accentGreen },
-          ]}
-          onPress={() => setNetworkFilter('zaspot')}
-        >
-          <Text
-            style={[
-              styles.networkToggleText,
-              { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
-            ]}
-          >
-            ZAspot ({ocppStations.length})
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.networkToggleBtn,
-            networkFilter === 'all' && { backgroundColor: Colors.brand.accentGreen },
-          ]}
-          onPress={() => setNetworkFilter('all')}
-        >
-          <Text
-            style={[
-              styles.networkToggleText,
-              { color: networkFilter === 'all' ? '#fff' : colors.text },
-            ]}
-          >
-            Vše
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Station Count Badge */}
-      <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
-        <Ionicons name="location" size={16} color={Colors.brand.accentGreen} />
-        <Text style={[styles.countText, { color: colors.text }]}>
-          {filteredStations.length} {t.map.allStations.toLowerCase()}
-        </Text>
-      </View>
-
-      {/* Offline Indicator */}
-      {isOffline && cacheInfo && (
-        <View style={[styles.offlineBadge, { backgroundColor: '#F59E0B' }]}>
-          <Ionicons name="cloud-offline" size={14} color="#FFFFFF" />
-          <Text style={styles.offlineText}>{cacheInfo}</Text>
-        </View>
-      )}
 
       {/* Loading indicator: map init OR EMP roaming stations being fetched */}
       {(mapStatus !== 'loaded' || empLoading) && (
         <View
           style={{
             position: 'absolute',
-            top: 165,
+            top: insets.top + 120,
             alignSelf: 'center',
-            backgroundColor: '#FFFFFFE0',
+            backgroundColor: colors.surface,
             paddingHorizontal: 14,
             paddingVertical: 8,
             borderRadius: 20,
@@ -474,32 +487,38 @@ export default function MapScreen() {
           }}
         >
           <ActivityIndicator size="small" color={Colors.brand.accentGreen} />
-          <Text style={{ color: '#1A1A1A', fontSize: 12, fontWeight: '600' }}>
+          <Text style={{ color: colors.text, fontSize: 12, fontWeight: '600' }}>
             {mapStatus !== 'loaded' ? 'Načítání mapy...' : 'Načítání roamingových stanic...'}
           </Text>
         </View>
       )}
 
-      {/* Location Button */}
-      <TouchableOpacity
-        style={[styles.locationButton, { backgroundColor: colors.surface }]}
-        onPress={centerOnLocation}
-      >
-        <Ionicons name="locate" size={24} color={Colors.brand.accentGreen} />
-      </TouchableOpacity>
+      {/* Location + QR scan FABs — hidden while a station card is open so they
+          don't sit hidden under the bottom sheet. */}
+      {!selectedStation && (
+        <>
+          {/* Location Button */}
+          <TouchableOpacity
+            style={[styles.locationButton, { backgroundColor: colors.surface }]}
+            onPress={centerOnLocation}
+          >
+            <Ionicons name="locate" size={24} color={Colors.brand.accentGreen} />
+          </TouchableOpacity>
 
-      {/* QR Scan Button — opens the station QR scanner full-screen */}
-      <TouchableOpacity
-        style={[styles.scanButton, { backgroundColor: Colors.brand.accentGreen }]}
-        onPress={() => router.push('/scan')}
-        accessibilityLabel="Skenovat QR kód stanice"
-      >
-        <Ionicons name="qr-code-outline" size={26} color="#fff" />
-      </TouchableOpacity>
+          {/* QR Scan Button — opens the station QR scanner full-screen */}
+          <TouchableOpacity
+            style={[styles.scanButton, { backgroundColor: Colors.brand.accentGreen }]}
+            onPress={() => router.push('/scan')}
+            accessibilityLabel="Skenovat QR kód stanice"
+          >
+            <Ionicons name="qr-code-outline" size={26} color="#fff" />
+          </TouchableOpacity>
+        </>
+      )}
 
       {/* Station Detail Card */}
       {selectedStation && (
-        <View style={[styles.stationCard, { backgroundColor: colors.surface }]}>
+        <View style={[styles.stationCard, { backgroundColor: colors.surface, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
           {/* Handle bar */}
           <View style={styles.handleBar}>
             <View style={[styles.handle, { backgroundColor: colors.border }]} />
@@ -848,15 +867,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  searchContainer: {
+  headerArea: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
     paddingHorizontal: 16,
     paddingTop: 8,
     gap: 10,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  controlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   searchBar: {
     flex: 1,
@@ -889,9 +916,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
   },
   networkToggle: {
-    position: 'absolute',
-    top: 110,
-    left: 16,
     flexDirection: 'row',
     borderRadius: 20,
     padding: 3,
@@ -912,9 +936,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   countBadge: {
-    position: 'absolute',
-    top: 115,
-    right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -931,10 +952,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  offlineRow: {
+    alignItems: 'center',
+    marginTop: 2,
+  },
   offlineBadge: {
-    position: 'absolute',
-    top: 155,
-    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,

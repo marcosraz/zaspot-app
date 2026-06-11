@@ -22,6 +22,8 @@ export interface DailyPrices {
     lowestSlot: number;
     highestSlot: number;
   };
+  /** CZK per EUR — used to display prices in EUR when the user toggles currency. */
+  exchangeRate?: number;
 }
 
 // Cache for today's prices
@@ -165,6 +167,7 @@ export async function fetchSpotPrices(
           date: data.date,
           prices: data.prices,
           stats: data.stats,
+          exchangeRate: data.exchangeRate,
         };
         if (isToday) {
           cachedPrices = result;

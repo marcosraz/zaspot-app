@@ -41,8 +41,10 @@ interface ReceiptData {
   stopTimestamp: string;
   durationMinutes: number;
   energyKwh: number;
-  totalCostCzk: number;
-  avgSpotPriceCzkKwh: number;
+  // Backend returns null for these on completed-but-uncosted transactions
+  // (e.g. cron-closed zombie sessions, roaming sessions awaiting CDR).
+  totalCostCzk: number | null;
+  avgSpotPriceCzkKwh: number | null;
   status: string;
   userName: string;
   isArchived: boolean;
@@ -101,7 +103,7 @@ export default function ReceiptScreen() {
     try {
       await Share.share({
         title: `${l.title} - ZAspot`,
-        message: `${l.receiptNo} ${receipt.transactionId}\n${l.station}: ${receipt.stationName}\n${l.energy}: ${formatEnergy(receipt.energyKwh)} kWh\n${l.total}: ${format(receipt.totalCostCzk, { decimals: 2 })}\n${l.date}: ${formatDate(receipt.startTimestamp)}`,
+        message: `${l.receiptNo} ${receipt.transactionId}\n${l.station}: ${receipt.stationName}\n${l.energy}: ${formatEnergy(receipt.energyKwh)} kWh\n${l.total}: ${format((receipt.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}\n${l.date}: ${formatDate(receipt.startTimestamp)}`,
       });
     } catch (error) {
       // User cancelled share
@@ -149,7 +151,7 @@ export default function ReceiptScreen() {
     <div class="row"><span class="label">${l.duration || 'Duration'}</span><span class="val">${formatDuration(r.durationMinutes)}</span></div>
     <div class="row"><span class="label">${l.energy}</span><span class="val">${formatEnergy(r.energyKwh)} kWh</span></div>
     ${r.avgSpotPriceCzkKwh ? `<div class="row"><span class="label">${(l as any).avgPrice || 'Avg. price'}</span><span class="val">${format(r.avgSpotPriceCzkKwh, { perKwh: true })}</span></div>` : ''}
-    <div class="row"><span class="label">${l.total}</span><span class="val total">${format(r.totalCostCzk, { decimals: 2 })}</span></div>
+    <div class="row"><span class="label">${l.total}</span><span class="val total">${format((r.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}</span></div>
     ${r.userName ? `<div class="row"><span class="label">${(l as any).customer || 'Customer'}</span><span class="val">${r.userName}</span></div>` : ''}
   </div>
 
@@ -389,11 +391,13 @@ export default function ReceiptScreen() {
             </View>
           )}
 
-          {/* Total */}
+          {/* Total — shown GROSS (incl. 21% DPH) to match the wallet deduction.
+              total_cost_czk is stored NET in the DB; every user-facing surface
+              (wallet, web receipt, my-charges) displays × 1.21. */}
           <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.totalLabel, { color: colors.text }]}>{l.total}</Text>
             <Text style={[styles.totalValue, { color: Colors.brand.accentGreen }]}>
-              {format(receipt.totalCostCzk, { decimals: 2 })}
+              {format((receipt.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}
             </Text>
           </View>
         </View>

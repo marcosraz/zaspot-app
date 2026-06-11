@@ -35,7 +35,10 @@ import { Layout } from '../../constants/layout';
 function parseChargePointId(raw: string): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
-  const urlMatch = trimmed.match(/(?:zaspot\.cz|zaspot\.eu)\/(?:charge|c)\/([A-Za-z0-9-]+)/i);
+  // Also accept the sticker URL zaspot.cz/api/qr/<id>?connector=N — the website's
+  // QR endpoint 302-redirects that to /charge/<id>, but a raw camera scan can't
+  // follow the redirect, so we match /api/qr/ directly alongside /charge/ and /c/.
+  const urlMatch = trimmed.match(/(?:zaspot\.cz|zaspot\.eu)\/(?:api\/qr|charge|c)\/([A-Za-z0-9-]+)/i);
   if (urlMatch?.[1]) return urlMatch[1];
   // Plain code — accept common ZAspot/AUTEL/Hubject formats
   if (/^[A-Z]{2,4}-?[A-Z]{0,4}-?E?[0-9A-Z]{4,12}$/i.test(trimmed)) return trimmed;
@@ -47,6 +50,7 @@ export default function ScanScreen() {
   const { colors } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
+  const [navigating, setNavigating] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const handlingRef = useRef(false);
@@ -58,13 +62,19 @@ export default function ScanScreen() {
     }
   }, [permission]);
 
-  const navigateToStation = (chargePointId: string) => {
+  const navigateToStation = (chargePointId: string, connector?: string) => {
+    setNavigating(true); // brief confirmation overlay before the screen changes
     // Reset scanner after a delay so user can scan another if they come back
     setTimeout(() => {
       handlingRef.current = false;
       setScanned(false);
+      setNavigating(false);
     }, 1500);
-    router.push(`/station/${chargePointId}`);
+    router.push(
+      connector
+        ? `/station/${chargePointId}?connector=${encodeURIComponent(connector)}`
+        : `/station/${chargePointId}`,
+    );
   };
 
   const handleBarcode = (data: string) => {
@@ -73,6 +83,9 @@ export default function ScanScreen() {
     setScanned(true);
 
     const id = parseChargePointId(data);
+    // Preselect the plug if the sticker URL carried ?connector=N
+    const connMatch = data.match(/[?&]connector=([^&\s]+)/i);
+    const connector = connMatch ? decodeURIComponent(connMatch[1]) : undefined;
     if (!id) {
       Alert.alert(
         'Neznámý QR kód',
@@ -81,7 +94,7 @@ export default function ScanScreen() {
       );
       return;
     }
-    navigateToStation(id);
+    navigateToStation(id, connector);
   };
 
   const handleManualSubmit = () => {
@@ -152,17 +165,26 @@ export default function ScanScreen() {
           onBarcodeScanned={scanned ? undefined : (result) => handleBarcode(result.data)}
         />
 
-        {/* Scanning frame overlay */}
+        {/* Scanning frame overlay — dimmed surround with a transparent cutout so
+            the eye is drawn to where the QR code should be aimed. The mask is built
+            from four translucent blocks (top / left+hole+right / bottom). */}
         <View pointerEvents="none" style={styles.overlay}>
-          <View style={styles.scanFrame}>
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
+          <View style={styles.mask} />
+          <View style={styles.maskMiddle}>
+            <View style={styles.mask} />
+            <View style={styles.scanFrame}>
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+            </View>
+            <View style={styles.mask} />
           </View>
-          <Text style={styles.overlayText}>
-            Namiřte fotoaparát na QR kód u stanice
-          </Text>
+          <View style={[styles.mask, styles.maskBottom]}>
+            <Text style={styles.overlayText}>
+              Namiřte fotoaparát na QR kód u stanice
+            </Text>
+          </View>
         </View>
 
         {/* Bottom controls */}
@@ -199,6 +221,14 @@ export default function ScanScreen() {
             </View>
           )}
         </SafeAreaView>
+
+        {/* Brief confirmation while we open the matched station */}
+        {navigating && (
+          <View style={styles.scannedOverlay}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={styles.scannedText}>Otevírám stanici…</Text>
+          </View>
+        )}
       </View>
     </>
   );
@@ -265,9 +295,26 @@ const styles = StyleSheet.create({
   cameraContainer: { flex: 1, backgroundColor: '#000' },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
+  },
+  mask: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+  },
+  maskMiddle: {
+    flexDirection: 'row',
+    height: 260,
+  },
+  maskBottom: {
     alignItems: 'center',
   },
+  scannedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  scannedText: { color: '#fff', fontSize: 15, fontWeight: '600' },
   scanFrame: { width: 260, height: 260, position: 'relative' },
   corner: {
     position: 'absolute',

@@ -95,6 +95,35 @@ export default function ProfileScreen() {
 
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
+  const [showCustomVehicle, setShowCustomVehicle] = useState(false);
+  const [customVehName, setCustomVehName] = useState('');
+  const [customVehBattery, setCustomVehBattery] = useState('');
+  const [customVehConsumption, setCustomVehConsumption] = useState('');
+
+  const saveCustomVehicle = () => {
+    const name = customVehName.trim();
+    const battery = parseFloat(customVehBattery.replace(',', '.'));
+    const consumption = parseFloat(customVehConsumption.replace(',', '.'));
+    if (!name) { Alert.alert('Chyba', 'Zadejte název vozidla'); return; }
+    if (!(battery > 0)) { Alert.alert('Chyba', 'Zadejte kapacitu baterie v kWh'); return; }
+    if (!(consumption > 0)) { Alert.alert('Chyba', 'Zadejte průměrnou spotřebu v kWh/100 km'); return; }
+    // Existing route/range logic is range-based; derive range from battery + consumption.
+    const rangeKm = Math.round((battery / consumption) * 100);
+    setSelectedVehicle({
+      id: `custom-${Date.now()}`,
+      name,
+      manufacturer: '',
+      batteryCapacityKwh: battery,
+      rangeKm,
+      maxChargingPowerKw: 50, // sane default; not part of the requested fields
+      connectorType: 'CCS2',
+    });
+    setCustomVehName('');
+    setCustomVehBattery('');
+    setCustomVehConsumption('');
+    setShowCustomVehicle(false);
+    setShowVehicleSelector(false);
+  };
   const [showPriceAlertEditor, setShowPriceAlertEditor] = useState(false);
   const [showAutoCharge, setShowAutoCharge] = useState(false);
   const [registeredVehicles, setRegisteredVehicles] = useState<RegisteredVehicle[]>([]);
@@ -473,6 +502,66 @@ export default function ProfileScreen() {
 
             {showVehicleSelector && (
               <View style={[styles.vehicleSelector, { backgroundColor: colors.surfaceSecondary }]}>
+                {/* Header with close (X) — Pavel reported there was no way to close */}
+                <View style={styles.vehicleSelectorHeader}>
+                  <Text style={[styles.manufacturerHeader, { color: colors.textSecondary, marginTop: 0 }]}>
+                    {t.profile.myVehicle}
+                  </Text>
+                  <TouchableOpacity onPress={() => { setShowVehicleSelector(false); setShowCustomVehicle(false); }} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="close" size={22} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Custom vehicle entry — avoids brand/model trademarks */}
+                <TouchableOpacity
+                  style={styles.vehicleOption}
+                  onPress={() => setShowCustomVehicle((v) => !v)}
+                >
+                  <View style={styles.vehicleInfo}>
+                    <Text style={[styles.vehicleName, { color: Colors.brand.accentGreen }]}>
+                      + {t.profile.customVehicle}
+                    </Text>
+                    <Text style={[styles.vehicleSpecs, { color: colors.textMuted }]}>
+                      {t.profile.customVehicleHint}
+                    </Text>
+                  </View>
+                  <Ionicons name={showCustomVehicle ? 'chevron-up' : 'chevron-down'} size={20} color={colors.textMuted} />
+                </TouchableOpacity>
+
+                {showCustomVehicle && (
+                  <View style={styles.customVehicleForm}>
+                    <TextInput
+                      style={[styles.customVehicleInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                      placeholder={t.profile.vehicleName}
+                      placeholderTextColor={colors.textMuted}
+                      value={customVehName}
+                      onChangeText={setCustomVehName}
+                    />
+                    <TextInput
+                      style={[styles.customVehicleInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                      placeholder={t.profile.batteryKwh}
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      value={customVehBattery}
+                      onChangeText={setCustomVehBattery}
+                    />
+                    <TextInput
+                      style={[styles.customVehicleInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                      placeholder={t.profile.avgConsumption}
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      value={customVehConsumption}
+                      onChangeText={setCustomVehConsumption}
+                    />
+                    <TouchableOpacity
+                      style={[styles.customVehicleSave, { backgroundColor: Colors.brand.accentGreen }]}
+                      onPress={saveCustomVehicle}
+                    >
+                      <Text style={styles.customVehicleSaveText}>{t.common.save}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 <ScrollView style={{ maxHeight: 300 }} nestedScrollEnabled>
                   {Object.entries(vehiclesByManufacturer).map(([manufacturer, vehicles]) => (
                     <View key={manufacturer}>
@@ -1021,6 +1110,36 @@ const styles = StyleSheet.create({
     marginBottom: Layout.spacing.md,
     borderRadius: Layout.borderRadius.lg,
     overflow: 'hidden',
+  },
+  vehicleSelectorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Layout.spacing.md,
+    paddingTop: Layout.spacing.md,
+  },
+  customVehicleForm: {
+    paddingHorizontal: Layout.spacing.md,
+    paddingBottom: Layout.spacing.md,
+    gap: Layout.spacing.sm,
+  },
+  customVehicleInput: {
+    borderWidth: 1,
+    borderRadius: Layout.borderRadius.md,
+    paddingHorizontal: Layout.spacing.md,
+    paddingVertical: Layout.spacing.sm,
+    fontSize: Layout.fontSize.md,
+  },
+  customVehicleSave: {
+    borderRadius: Layout.borderRadius.md,
+    paddingVertical: Layout.spacing.sm + 2,
+    alignItems: 'center',
+    marginTop: Layout.spacing.xs,
+  },
+  customVehicleSaveText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: Layout.fontSize.md,
   },
   manufacturerHeader: {
     fontSize: Layout.fontSize.xs,

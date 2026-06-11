@@ -44,14 +44,20 @@ export interface ChargingStation {
 
 // Fetch all stations
 export async function fetchStations(): Promise<ChargingStation[]> {
+  // /charging-stations is a ~580 KB payload — cap it at 8s so a slow response
+  // can't stall the home screen's nearby-stations load indefinitely.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
   try {
-    const res = await fetch(`${API_BASE}/charging-stations`);
+    const res = await fetch(`${API_BASE}/charging-stations`, { signal: controller.signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
     return json.stations || [];
   } catch (error) {
     console.error('Error fetching stations:', error);
     return [];
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

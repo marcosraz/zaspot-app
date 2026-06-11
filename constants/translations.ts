@@ -136,6 +136,9 @@ export interface Translations {
     synced: string;
     localOnly: string;
     customVehicle: string;
+    customVehicleHint: string;
+    batteryKwh: string;
+    avgConsumption: string;
     batteryCapacity: string;
     maxChargingPower: string;
     priceAlerts: string;
@@ -367,7 +370,7 @@ export const translations: Record<Language, Translations> = {
       profile: 'Profil',
     },
     home: {
-      welcome: 'Vítejte v ZAspot',
+      welcome: 'Vítejte v',
       currentPrice: 'Aktuální cena',
       priceNow: 'Cena teď',
       perKwh: 'Kč/kWh',
@@ -477,6 +480,9 @@ export const translations: Record<Language, Translations> = {
       synced: 'Synchronizováno',
       localOnly: 'Pouze lokálně',
       customVehicle: 'Vlastní vozidlo',
+      customVehicleHint: 'Zadejte vlastní název, baterii a spotřebu',
+      batteryKwh: 'Kapacita baterie (kWh)',
+      avgConsumption: 'Průměrná spotřeba (kWh/100 km)',
       batteryCapacity: 'Kapacita baterie',
       maxChargingPower: 'Max. nabíjecí výkon',
       history: 'Historie nabíjení',
@@ -691,7 +697,7 @@ export const translations: Record<Language, Translations> = {
       profile: 'Profile',
     },
     home: {
-      welcome: 'Welcome to ZAspot',
+      welcome: 'Welcome to',
       currentPrice: 'Current Price',
       priceNow: 'Price Now',
       perKwh: 'CZK/kWh',
@@ -801,6 +807,9 @@ export const translations: Record<Language, Translations> = {
       synced: 'Synced',
       localOnly: 'Local Only',
       customVehicle: 'Custom Vehicle',
+      customVehicleHint: 'Enter your own name, battery and consumption',
+      batteryKwh: 'Battery capacity (kWh)',
+      avgConsumption: 'Average consumption (kWh/100 km)',
       batteryCapacity: 'Battery Capacity',
       maxChargingPower: 'Max Charging Power',
       history: 'Charging History',
@@ -1015,7 +1024,7 @@ export const translations: Record<Language, Translations> = {
       profile: 'Profil',
     },
     home: {
-      welcome: 'Willkommen bei ZAspot',
+      welcome: 'Willkommen bei',
       currentPrice: 'Aktueller Preis',
       priceNow: 'Preis jetzt',
       perKwh: 'CZK/kWh',
@@ -1125,6 +1134,9 @@ export const translations: Record<Language, Translations> = {
       synced: 'Synchronisiert',
       localOnly: 'Nur lokal',
       customVehicle: 'Eigenes Fahrzeug',
+      customVehicleHint: 'Eigenen Namen, Batterie und Verbrauch eingeben',
+      batteryKwh: 'Batteriekapazität (kWh)',
+      avgConsumption: 'Durchschnittsverbrauch (kWh/100 km)',
       batteryCapacity: 'Batteriekapazität',
       maxChargingPower: 'Max. Ladeleistung',
       history: 'Ladehistorie',
@@ -1339,7 +1351,7 @@ export const translations: Record<Language, Translations> = {
       profile: 'Profil',
     },
     home: {
-      welcome: 'Witamy w ZAspot',
+      welcome: 'Witamy w',
       currentPrice: 'Aktualna cena',
       priceNow: 'Cena teraz',
       perKwh: 'CZK/kWh',
@@ -1449,6 +1461,9 @@ export const translations: Record<Language, Translations> = {
       synced: 'Zsynchronizowane',
       localOnly: 'Tylko lokalnie',
       customVehicle: 'Własny pojazd',
+      customVehicleHint: 'Wpisz własną nazwę, baterię i zużycie',
+      batteryKwh: 'Pojemność baterii (kWh)',
+      avgConsumption: 'Średnie zużycie (kWh/100 km)',
       batteryCapacity: 'Pojemność baterii',
       maxChargingPower: 'Maks. moc ładowania',
       history: 'Historia ładowania',

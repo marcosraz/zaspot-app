@@ -30,11 +30,20 @@ export interface PendingVehicle {
  * Fetch registered AutoCharge vehicles (requires auth)
  */
 export async function fetchRegisteredVehicles(): Promise<RegisteredVehicle[]> {
-  const res = await apiFetch<RegisteredVehicle[]>('/vehicles', {
+  // API shape: { vehicles: [{ id, macAddress, description, status, createdAt }] }
+  // (NOT a bare array, and field names differ — must unwrap + remap.)
+  const res = await apiFetch<{ vehicles?: any[] }>('/vehicles', {
     requireAuth: true,
   });
-  if (res.ok && Array.isArray(res.data)) {
-    return res.data;
+  if (res.ok && Array.isArray(res.data?.vehicles)) {
+    return res.data.vehicles.map((v) => ({
+      id: v.id ?? v.macAddress,
+      id_tag: v.macAddress,
+      user_id: '',
+      status: v.status,
+      description: v.description ?? null,
+      created_at: v.createdAt,
+    }));
   }
   return [];
 }
@@ -43,11 +52,19 @@ export async function fetchRegisteredVehicles(): Promise<RegisteredVehicle[]> {
  * Fetch pending/discovered vehicles not yet registered (requires auth)
  */
 export async function fetchPendingVehicles(): Promise<PendingVehicle[]> {
-  const res = await apiFetch<PendingVehicle[]>('/vehicles/pending', {
+  // API shape: { pendingVehicles: [{ macAddress, lastSeen, attempts, chargePointId }] }
+  // This is the AutoCharge MAC the user registers — unwrap + remap to UI fields.
+  const res = await apiFetch<{ pendingVehicles?: any[] }>('/vehicles/pending', {
     requireAuth: true,
   });
-  if (res.ok && Array.isArray(res.data)) {
-    return res.data;
+  if (res.ok && Array.isArray(res.data?.pendingVehicles)) {
+    return res.data.pendingVehicles.map((v) => ({
+      id: v.macAddress,
+      id_tag: v.macAddress,
+      last_charge_point_id: v.chargePointId,
+      last_seen_at: v.lastSeen,
+      times_seen: v.attempts,
+    }));
   }
   return [];
 }
@@ -93,11 +110,18 @@ export interface RfidCard {
  * Fetch registered RFID cards (requires auth)
  */
 export async function fetchRfidCards(): Promise<RfidCard[]> {
-  const res = await apiFetch<RfidCard[]>('/rfid-tags', {
+  // API shape: { rfidTags: [{ id, tagId, description, status, createdAt }] }
+  const res = await apiFetch<{ rfidTags?: any[] }>('/rfid-tags', {
     requireAuth: true,
   });
-  if (res.ok && Array.isArray(res.data)) {
-    return res.data;
+  if (res.ok && Array.isArray(res.data?.rfidTags)) {
+    return res.data.rfidTags.map((t) => ({
+      id: t.id ?? t.tagId,
+      id_tag: t.tagId,
+      description: t.description ?? null,
+      status: t.status,
+      created_at: t.createdAt,
+    }));
   }
   return [];
 }

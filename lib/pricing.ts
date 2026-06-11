@@ -5,6 +5,14 @@
 
 const API_BASE = 'https://www.zaspot.cz/api';
 
+/**
+ * ZAfix — ZAspot's fixed energy price (CZK/kWh, excl. VAT/distribution/fees).
+ * Mirrors `ZAFIX_PRICE` on the web homepage (HomePageClient.tsx). It is a flat
+ * alternative to the fluctuating OTE spot energy price; the surrounding fees
+ * (distribution, markup, platform fee, VAT) are identical to the spot path.
+ */
+export const ZAFIX_ENERGY_PRICE = 2.9;
+
 export interface SpotPriceData {
   price: number;                // Base spot price CZK/kWh
   timeSlot: string;             // e.g. "14:00 - 14:15"
@@ -32,6 +40,11 @@ export interface EffectivePrices {
   dcPrice: number;
   acMarkup: number;
   dcMarkup: number;
+  // ZAfix fixed-price variant — same formula as ac/dcPrice but with the energy
+  // term replaced by the flat ZAFIX_ENERGY_PRICE instead of the live spot price.
+  zafixEnergyPrice: number; // raw fixed energy price excl. VAT (== ZAFIX_ENERGY_PRICE)
+  zafixAcPrice: number;     // total AC incl. VAT
+  zafixDcPrice: number;     // total DC incl. VAT
   timeSlot: string;
   timestamp: string;
 }
@@ -70,6 +83,10 @@ export async function fetchEffectivePrices(): Promise<EffectivePrices | null> {
       // Web formula: (spot + distrib + markup + platform) * VAT
       acPrice: (data.price + acDist + data.acMarkup + data.platformFee) * VAT,
       dcPrice: (data.price + dcDist + data.dcMarkup + data.platformFee) * VAT,
+      // ZAfix: identical formula, flat energy price instead of spot
+      zafixEnergyPrice: ZAFIX_ENERGY_PRICE,
+      zafixAcPrice: (ZAFIX_ENERGY_PRICE + acDist + data.acMarkup + data.platformFee) * VAT,
+      zafixDcPrice: (ZAFIX_ENERGY_PRICE + dcDist + data.dcMarkup + data.platformFee) * VAT,
       timeSlot: data.timeSlot,
       timestamp: data.timestamp,
     };

@@ -226,7 +226,8 @@ export default function StationDetailScreen() {
   };
 
   const getSessionDurationMinutes = (session: ChargingSession): number => {
-    const start = new Date(session.startTimestamp).getTime();
+    // Normalize PG "YYYY-MM-DD HH:MM:SS+00" → ISO so Hermes parses it (else NaN).
+    const start = new Date(session.startTimestamp.replace(' ', 'T')).getTime();
     const now = Date.now();
     return (now - start) / 60000;
   };
@@ -478,11 +479,11 @@ export default function StationDetailScreen() {
                     )}
                   </View>
 
-                  {activeSession.totalCostCzk != null && (
+                  {(activeSession.accumulatedCostCzk ?? activeSession.totalCostCzk) != null && (
                     <View style={[styles.costRow, { borderTopColor: colors.border }]}>
                       <Text style={[styles.costLabel, { color: colors.textSecondary }]}>{l.cost}</Text>
                       <Text style={[styles.costValue, { color: colors.text }]}>
-                        {format(activeSession.totalCostCzk, { decimals: 2 })}
+                        {format(((activeSession.accumulatedCostCzk ?? activeSession.totalCostCzk) || 0) * 1.21, { decimals: 2 })}
                       </Text>
                     </View>
                   )}

@@ -190,7 +190,10 @@ export default function HistoryScreen() {
               <View style={styles.txStat}>
                 <Text style={[styles.txStatLabel, { color: colors.textMuted }]}>{t.history.cost}</Text>
                 <Text style={[styles.txStatValue, { color: colors.text }]}>
-                  {tx.totalCostCzk != null ? format(tx.totalCostCzk, { decimals: 2 }) : '—'}
+                  {/* totalCostCzk is NET; display gross (× 1.21 DPH) to match
+                      web receipt / wallet / my-charges. Pass through the global
+                      currency formatter so the EUR/CZK toggle still applies. */}
+                  {tx.totalCostCzk != null ? format(tx.totalCostCzk * 1.21, { decimals: 2 }) : '—'}
                 </Text>
               </View>
               <View style={styles.txStat}>

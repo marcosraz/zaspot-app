@@ -33,11 +33,14 @@ export default function StationReviewsScreen() {
       fetchStationReviews(chargePointId),
       fetchStationPhotos(chargePointId),
     ]);
-    if (rRes.ok && rRes.data?.success) {
-      setReviews(rRes.data.reviews);
-      setAverage(rRes.data.average_rating);
+    // The per-station GET routes return { reviews } / { photos } (no `success`,
+    // no average) — compute the average client-side.
+    if (rRes.ok && Array.isArray(rRes.data?.reviews)) {
+      const list = rRes.data.reviews;
+      setReviews(list);
+      setAverage(list.length ? list.reduce((s, r) => s + (r.rating || 0), 0) / list.length : 0);
     }
-    if (pRes.ok && pRes.data?.success) setPhotos(pRes.data.photos);
+    if (pRes.ok && Array.isArray(pRes.data?.photos)) setPhotos(pRes.data.photos);
     setLoading(false);
   };
 
@@ -51,7 +54,7 @@ export default function StationReviewsScreen() {
     const res = await submitReview(chargePointId, rating, comment.trim() || undefined);
     setSubmitting(false);
     if (res.ok && res.data?.success) {
-      Alert.alert('Děkujeme', 'Vaše recenze bude zveřejněna po schválení.');
+      Alert.alert('Děkujeme', 'Vaše recenze byla přidána.');
       setComment('');
       setRating(5);
       load();

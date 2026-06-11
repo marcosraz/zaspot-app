@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -23,6 +24,7 @@ import {
 export default function CommunityScreen() {
   const { colors } = useTheme();
   const { format } = useCurrency();
+  const { user } = useAuth();
   const [community, setCommunity] = useState<CommunityInfo | null>(null);
   const [stats, setStats] = useState<MyCommunityStats | null>(null);
   const [billings, setBillings] = useState<any[]>([]);
@@ -59,21 +61,28 @@ export default function CommunityScreen() {
     setRefreshing(false);
   };
 
+  const doApply = async (c: CommunityInfo, applicationType: 'vyrobna' | 'spotreba') => {
+    const email = user?.email;
+    const fullName = user?.name || user?.email?.split('@')[0] || '';
+    if (!email) {
+      Alert.alert('Přihlášení', 'Pro vstup do komunity se nejprve přihlaste.');
+      return;
+    }
+    const res = await applyToCommunity(c.id, { fullName, email, applicationType });
+    if (res.ok && res.data?.success) {
+      Alert.alert('Žádost odeslána', 'Po schválení uvidíte své statistiky zde.');
+      await load();
+    } else {
+      Alert.alert('Chyba', res.data?.error || 'Žádost se nepodařilo odeslat');
+    }
+  };
+
   const apply = (c: CommunityInfo) => {
-    Alert.alert('Vstoupit do komunity', c.name, [
+    // The apply endpoint needs a role; ask producer vs. consumer.
+    Alert.alert(c.name, 'Jste výrobce energie, nebo spotřebitel?', [
       { text: 'Zrušit', style: 'cancel' },
-      {
-        text: 'Vstoupit',
-        onPress: async () => {
-          const res = await applyToCommunity(c.id);
-          if (res.ok && res.data?.success) {
-            Alert.alert('Žádost odeslána', 'Po schválení uvidíte své statistiky zde.');
-            await load();
-          } else {
-            Alert.alert('Chyba', 'Žádost se nepodařilo odeslat');
-          }
-        },
-      },
+      { text: 'Výrobna', onPress: () => doApply(c, 'vyrobna') },
+      { text: 'Spotřeba', onPress: () => doApply(c, 'spotreba') },
     ]);
   };
 

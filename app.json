@@ -16,7 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "cz.zaspot.app",
-      "buildNumber": "100",
+      "buildNumber": "103",
+      "associatedDomains": [
+        "applinks:zaspot.cz",
+        "applinks:www.zaspot.cz"
+      ],
       "infoPlist": {
         "CFBundleURLTypes": [
           {

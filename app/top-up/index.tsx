@@ -224,7 +224,9 @@ export default function TopUpScreen() {
                 )}
               </TouchableOpacity>
               <Text style={[styles.hint, { color: colors.textMuted }]}>
-                Platební metody: Visa, Mastercard, Google Pay, Apple Pay
+                Po stisknutí „Dobít" se otevře zabezpečená platební brána, kde
+                můžete zaplatit kartou (Visa, Mastercard) nebo přes Google Pay /
+                Apple Pay.
               </Text>
             </>
           )}

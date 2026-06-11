@@ -96,10 +96,16 @@ export async function apiFetch<T = any>(
     headers['Authorization'] = `Bearer ${auth.token}`;
   }
 
+  // Hard timeout so a slow/stalled endpoint fails fast instead of hanging the UI
+  // forever. An abort surfaces as { ok:false, status:0 } (catch below), which
+  // screens already treat as an error and use to stop their spinners.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
   try {
     const res = await fetch(`${API_BASE}${endpoint}`, {
       ...fetchOptions,
       headers,
+      signal: controller.signal,
     });
 
     // Try to parse JSON response
@@ -122,6 +128,7 @@ export async function apiFetch<T = any>(
           const retryRes = await fetch(`${API_BASE}${endpoint}`, {
             ...fetchOptions,
             headers,
+            signal: controller.signal,
           });
           const retryData = retryRes.headers.get('content-type')?.includes('application/json')
             ? await retryRes.json()
@@ -141,6 +148,8 @@ export async function apiFetch<T = any>(
       status: 0,
       data: { error: 'Network error' } as any,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

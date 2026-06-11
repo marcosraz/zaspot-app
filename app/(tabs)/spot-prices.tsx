@@ -37,7 +37,12 @@ export default function SpotPricesScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { checkPriceAndNotify } = useNotifications();
-  const { format, symbol } = useCurrency();
+  // Global currency selection (shared across the app via CurrencyContext).
+  // `format` auto-converts a CZK amount to the selected display currency and
+  // `convert` returns the bare numeric value. `currency`/`symbol` describe the
+  // active selection. The in-app currency toggle lives in the global context,
+  // so this screen no longer keeps its own currency state.
+  const { format, convert, currency, setCurrency, symbol } = useCurrency();
   const [timeRange, setTimeRange] = useState<TimeRange>('today');
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -98,7 +103,9 @@ export default function SpotPricesScreen() {
   // Get data for current view
   const getChartData = () => {
     if (timeRange === 'today' && dailyData) {
-      const validPrices = dailyData.prices.filter(p => p.price > 0);
+      // Keep negative prices (OTE day-ahead can go below zero); only drop the
+      // `0` "no-data" sentinel slots.
+      const validPrices = dailyData.prices.filter(p => p.price !== 0);
       return {
         labels: validPrices.filter((_, i) => i % 4 === 0).map(p => p.time),
         values: validPrices.map(p => unit === 'kwh' ? p.priceKwh : p.price),
@@ -123,7 +130,20 @@ export default function SpotPricesScreen() {
     }
   };
 
-  const chartData = getChartData();
+  // Currency conversion is handled by the global CurrencyContext: `convert`
+  // turns a CZK amount into the selected display currency and `format` renders
+  // it as a localized string. Unit (kWh/MWh) handling stays local to this
+  // screen.
+  // EUR/kWh values are small (~0.11) → one extra decimal; MWh stays integer.
+  const decimals = unit === 'kwh' ? (currency === 'eur' ? 3 : 2) : 0;
+  const unitSuffix = unit === 'kwh' ? 'kWh' : 'MWh';
+  const unitLabel = `${symbol}/${unitSuffix}`;
+  // Render a CZK price in the active currency without the symbol (the unit
+  // label is shown separately), using the unit-aware decimal count.
+  const fmtPrice = (czk: number) => format(czk, { symbol: false, decimals });
+
+  const rawChartData = getChartData();
+  const chartData = { labels: rawChartData.labels, values: rawChartData.values.map(convert) };
   const screenWidth = Dimensions.get('window').width;
 
   // Stats
@@ -210,6 +230,32 @@ export default function SpotPricesScreen() {
           ))}
         </View>
 
+        {/* Currency Toggle (CZK default) */}
+        <View style={styles.unitToggle}>
+          <TouchableOpacity
+            style={[
+              styles.unitButton,
+              { backgroundColor: currency === 'czk' ? Colors.brand.accentGreen : colors.surface }
+            ]}
+            onPress={() => setCurrency('czk')}
+          >
+            <Text style={{ color: currency === 'czk' ? '#FFFFFF' : colors.text, fontWeight: '600' }}>
+              CZK
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.unitButton,
+              { backgroundColor: currency === 'eur' ? Colors.brand.accentGreen : colors.surface }
+            ]}
+            onPress={() => setCurrency('eur')}
+          >
+            <Text style={{ color: currency === 'eur' ? '#FFFFFF' : colors.text, fontWeight: '600' }}>
+              EUR
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* Unit Toggle */}
         <View style={styles.unitToggle}>
           <TouchableOpacity
@@ -249,10 +295,10 @@ export default function SpotPricesScreen() {
           </View>
           <View style={styles.currentPriceRow}>
             <Text style={[styles.currentPriceValue, { color: getPriceColor(stats.current) }]}>
-              {format(displayStats.current, { symbol: false, decimals: 2 })}
+              {fmtPrice(displayStats.current)}
             </Text>
             <Text style={[styles.currentPriceUnit, { color: colors.textSecondary }]}>
-              {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
+              {unitLabel}
             </Text>
           </View>
           <Text style={[styles.currentSlot, { color: colors.textMuted }]}>
@@ -278,7 +324,7 @@ export default function SpotPricesScreen() {
                 backgroundColor: colors.surface,
                 backgroundGradientFrom: colors.surface,
                 backgroundGradientTo: colors.surface,
-                decimalPlaces: unit === 'kwh' ? 2 : 0,
+                decimalPlaces: decimals,
                 color: (opacity = 1) => Colors.brand.accentGreen,
                 labelColor: () => colors.textSecondary,
                 style: {
@@ -308,58 +354,67 @@ export default function SpotPricesScreen() {
         )}
 
         {/* Hourly Prices List */}
-        {timeRange === 'today' && dailyData && (
-          <View style={[styles.hourlyContainer, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.hourlySectionTitle, { color: colors.text }]}>
-              {t.spotPrices.hourlyPrices}
-            </Text>
-            {dailyData.prices.filter(p => p.price > 0).map((p, idx) => {
-              const currentHour = new Date().getHours();
-              const isCurrent = p.slot === currentHour;
-              const barWidth = dailyData.stats.highest > 0
-                ? Math.max(8, (p.priceKwh / dailyData.stats.highest) * 100)
-                : 0;
-              const barColor = getPriceColor(p.priceKwh);
-              return (
-                <View
-                  key={idx}
-                  style={[
-                    styles.hourlyRow,
-                    isCurrent && { backgroundColor: isDark ? '#FFFFFF08' : '#F0FDF4' },
-                  ]}
-                >
-                  <View style={styles.hourlyTimeCol}>
-                    {isCurrent && <View style={[styles.currentDot, { backgroundColor: Colors.brand.accentGreen }]} />}
+        {timeRange === 'today' && dailyData && (() => {
+          // Include negative prices (OTE day-ahead can go below zero); only drop the
+          // `0` "no-data" sentinel. Bars are normalised over the full range with 0 as
+          // the baseline, so a negative price renders as the shortest (cheapest) bar.
+          const visible = dailyData.prices.filter(p => p.price !== 0);
+          const kwhValues = visible.map(p => p.priceKwh);
+          const maxKwh = kwhValues.length ? Math.max(...kwhValues) : 0;
+          const minKwh = kwhValues.length ? Math.min(...kwhValues) : 0;
+          const floor = Math.min(0, minKwh);
+          const range = (maxKwh - floor) || 1;
+          const currentHour = new Date().getHours();
+          return (
+            <View style={[styles.hourlyContainer, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.hourlySectionTitle, { color: colors.text }]}>
+                {t.spotPrices.hourlyPrices}
+              </Text>
+              {visible.map((p, idx) => {
+                const isCurrent = p.slot === currentHour;
+                const barWidth = Math.max(6, ((p.priceKwh - floor) / range) * 100);
+                const barColor = getPriceColor(p.priceKwh);
+                return (
+                  <View
+                    key={idx}
+                    style={[
+                      styles.hourlyRow,
+                      isCurrent && { backgroundColor: isDark ? '#FFFFFF08' : '#F0FDF4' },
+                    ]}
+                  >
+                    <View style={styles.hourlyTimeCol}>
+                      {isCurrent && <View style={[styles.currentDot, { backgroundColor: Colors.brand.accentGreen }]} />}
+                      <Text style={[
+                        styles.hourlyTime,
+                        { color: isCurrent ? Colors.brand.accentGreen : colors.textSecondary },
+                        isCurrent && { fontWeight: '700' },
+                      ]}>
+                        {p.time}
+                      </Text>
+                    </View>
+                    <View style={styles.hourlyBarCol}>
+                      <View style={[styles.hourlyBar, { width: `${barWidth}%`, backgroundColor: barColor }]} />
+                    </View>
                     <Text style={[
-                      styles.hourlyTime,
-                      { color: isCurrent ? Colors.brand.accentGreen : colors.textSecondary },
+                      styles.hourlyPrice,
+                      { color: barColor },
                       isCurrent && { fontWeight: '700' },
                     ]}>
-                      {p.time}
+                      {fmtPrice(unit === 'kwh' ? p.priceKwh : p.price)}
                     </Text>
                   </View>
-                  <View style={styles.hourlyBarCol}>
-                    <View style={[styles.hourlyBar, { width: `${barWidth}%`, backgroundColor: barColor }]} />
-                  </View>
-                  <Text style={[
-                    styles.hourlyPrice,
-                    { color: barColor },
-                    isCurrent && { fontWeight: '700' },
-                  ]}>
-                    {format(unit === 'kwh' ? p.priceKwh : p.price, { symbol: false, decimals: 2 })}
-                  </Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
+                );
+              })}
+            </View>
+          );
+        })()}
 
         {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-down" size={24} color={Colors.spotPrice.veryLow} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.veryLow }]}>
-              {format(displayStats.lowest, { symbol: false, decimals: 2 })}
+              {fmtPrice(displayStats.lowest)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.lowest}
@@ -372,7 +427,7 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="analytics" size={24} color="#3B82F6" />
             <Text style={[styles.statValue, { color: colors.text }]}>
-              {format(displayStats.average, { symbol: false, decimals: 2 })}
+              {fmtPrice(displayStats.average)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.average}
@@ -382,7 +437,7 @@ export default function SpotPricesScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface }]}>
             <Ionicons name="trending-up" size={24} color={Colors.spotPrice.high} />
             <Text style={[styles.statValue, { color: Colors.spotPrice.high }]}>
-              {format(displayStats.highest, { symbol: false, decimals: 2 })}
+              {fmtPrice(displayStats.highest)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>
               {t.spotPrices.highest}
@@ -418,11 +473,11 @@ export default function SpotPricesScreen() {
                 {t.spotPrices.bestTime}: {dailyData?.prices[stats.lowestSlot]?.time || '--:--'}
               </Text>
               <Text style={[styles.bestTimePrice, { color: recColor }]}>
-                {format(displayStats.lowest, { symbol: false, decimals: 2 })} {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
+                {fmtPrice(displayStats.lowest)} {unitLabel}
               </Text>
               {saving > 0 && (
                 <Text style={[styles.savingText, { color: colors.textSecondary }]}>
-                  {t.spotPrices.savingPotential}: {format(displaySaving, { symbol: false, decimals: 2 })} {unit === 'mwh' ? `${symbol}/MWh` : `${symbol}/kWh`}
+                  {t.spotPrices.savingPotential}: {fmtPrice(displaySaving)} {unitLabel}
                 </Text>
               )}
             </View>

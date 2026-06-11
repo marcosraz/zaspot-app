@@ -4,15 +4,20 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { Platform, Linking, AppState } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from './AuthContext';
 import { apiFetch } from '../lib/api';
 
 export interface CreditTransaction {
   id: string;
-  type: 'topup' | 'charge' | 'refund';
-  amount: number;
-  description: string;
+  user_id?: string;
+  // Matches /api/payment/history: field is amount_czk (number) and the type
+  // union includes adjustment/community_credit/bank_transfer.
+  type: 'topup' | 'charge' | 'refund' | 'adjustment' | 'community_credit' | 'bank_transfer';
+  amount_czk: number;
+  balance_after_czk?: number;
+  description: string | null;
   created_at: string;
   status: string;
 }
@@ -54,6 +59,19 @@ export function CreditProvider({ children }: CreditProviderProps) {
     }
   }, [isAuthenticated, authLoading]);
 
+  // Refresh balance whenever the app returns to the foreground. This is the
+  // safety net for the iOS Safari top-up flow: after paying in Safari the user
+  // may return to the app without the deep link firing — re-fetch on focus so
+  // the new balance shows up regardless.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && isAuthenticated) {
+        fetchBalance();
+      }
+    });
+    return () => sub.remove();
+  }, [isAuthenticated]);
+
   const fetchBalance = async () => {
     setLoading(true);
     try {
@@ -78,20 +96,44 @@ export function CreditProvider({ children }: CreditProviderProps) {
 
   const topUp = useCallback(async (amountCzk: number): Promise<{ success: boolean; error?: string }> => {
     try {
-      const res = await apiFetch<{ success: boolean; payment_url?: string; paymentUrl?: string; order_number?: string; error?: string }>(
+      // iOS: Apple Pay only renders in real Safari — SFSafariViewController (used
+      // by WebBrowser) hides the Apple Pay button. So on iOS we hand off to Safari
+      // via Linking.openURL and tag the payment with client:'app' so the GP
+      // callback bounces the user back into the app (see app/credit/success.tsx).
+      // Android keeps Custom Tabs (Google Pay works there) — unchanged behaviour.
+      const useSafari = Platform.OS === 'ios';
+
+      const res = await apiFetch<{ success: boolean; payment_url?: string; paymentUrl?: string; completed?: boolean; order_number?: string; error?: string }>(
         '/payment/create',
         {
           method: 'POST',
           // Backend expects snake_case `amount_czk` (see app/api/payment/create/route.ts)
-          body: JSON.stringify({ amount_czk: amountCzk }),
+          // client:'app' only on iOS — it drives the Safari return-marker + the
+          // CIT `completed` shortcut. Android keeps its Custom-Tabs flow unchanged.
+          body: JSON.stringify({ amount_czk: amountCzk, client: useSafari ? 'app' : undefined }),
           requireAuth: true,
         }
       );
 
+      // Saved-card (CIT) payments are captured instantly server-side — no browser
+      // to open. Just refresh the balance and report success.
+      if (res.ok && res.data?.completed) {
+        await fetchBalance();
+        return { success: true };
+      }
+
       // Backend returns `payment_url` (snake_case). Older fallback for `paymentUrl`.
       const paymentUrl = res.ok ? (res.data.payment_url ?? res.data.paymentUrl) : undefined;
       if (res.ok && paymentUrl) {
-        // Open GP webpay payment page in browser
+        if (useSafari) {
+          // Hands off to Safari and resolves immediately — the deep-link return
+          // (app/credit/success.tsx) and the AppState foreground listener refresh
+          // the balance once the user comes back.
+          await Linking.openURL(paymentUrl);
+          return { success: true };
+        }
+
+        // Android: Custom Tabs overlay; promise resolves when the tab is dismissed.
         const result = await WebBrowser.openBrowserAsync(paymentUrl, {
           dismissButtonStyle: 'cancel',
           presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,

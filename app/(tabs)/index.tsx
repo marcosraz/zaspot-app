@@ -28,6 +28,7 @@ import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../
 import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 import FavoriteButton from '../../components/FavoriteButton';
 import ActiveChargingWidget from '../../components/ActiveChargingWidget';
+import PriceSheet from '../../components/PriceSheet';
 
 interface QuickAction {
   icon: keyof typeof Ionicons.glyphMap;
@@ -38,7 +39,7 @@ interface QuickAction {
 
 export default function HomeScreen() {
   const { colors, isDark } = useTheme();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { favorites, isLoaded: favoritesLoaded } = useFavorites();
   const { checkPriceAndNotify } = useNotifications();
   const { format, symbol } = useCurrency();
@@ -77,27 +78,39 @@ export default function HomeScreen() {
         }
       }
       if (effective) setEffectivePrices(effective);
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    } finally {
+      // Show the screen as soon as prices are in — never block the spinner on the
+      // slow GPS fix + 582 KB stations download (that caused the intermittent
+      // long startup). Those run below, after render.
+      setLoading(false);
+    }
 
-      // Try to get location and nearby stations
+    // Location + nearby stations — fetched AFTER render so they can't gate it.
+    try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        const stations = await fetchNearbyStations(
-          location.coords.latitude,
-          location.coords.longitude,
-          20 // 20km radius
-        );
-        setNearbyStations(stations.slice(0, 3)); // Show top 3
-        setLocationError(null);
+        // Cap the GPS fix at 4s, then fall back to last-known position.
+        const location =
+          (await Promise.race([
+            Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+            new Promise<any>((resolve) => setTimeout(() => resolve(null), 4000)),
+          ])) || (await Location.getLastKnownPositionAsync());
+        if (location) {
+          const stations = await fetchNearbyStations(
+            location.coords.latitude,
+            location.coords.longitude,
+            20 // 20km radius
+          );
+          setNearbyStations(stations.slice(0, 3)); // Show top 3
+          setLocationError(null);
+        }
       } else {
         setLocationError('Přístup k poloze není povolen');
       }
     } catch (error) {
-      console.error('Error loading home data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error loading nearby stations:', error);
     }
   }, []);
 
@@ -184,42 +197,84 @@ export default function HomeScreen() {
               ZAspot
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.themeToggle, { backgroundColor: colors.surface }]}
-            onPress={() => router.push('/profile')}
-          >
-            <Ionicons name="settings-outline" size={24} color={colors.text} />
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            {/* QR scan — primary action for a charging app, available right on the
+                home screen (previously only reachable from the map tab). */}
+            <TouchableOpacity
+              style={[styles.themeToggle, { backgroundColor: Colors.brand.accentGreen }]}
+              onPress={() => router.push('/scan')}
+              accessibilityRole="button"
+              accessibilityLabel="Skenovat QR kód stanice"
+            >
+              <Ionicons name="qr-code-outline" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.themeToggle, { backgroundColor: colors.surface }]}
+              onPress={() => router.push('/profile')}
+              accessibilityRole="button"
+              accessibilityLabel={t.tabs.profile}
+            >
+              <Ionicons name="settings-outline" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Active Charging Session */}
         <ActiveChargingWidget />
 
-        {/* Current Price Card */}
-        <View style={[styles.priceCard, { backgroundColor: colors.surface }]}>
-          <View style={styles.priceHeader}>
-            <View style={styles.priceHeaderLeft}>
-              <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
-                {t.home.priceNow}
-              </Text>
-              <View style={[styles.liveBadge, { backgroundColor: Colors.brand.accentGreen + '20' }]}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>
-                  {effectivePrices?.timeSlot || 'LIVE'}
+        {/* Pricing — Spot vs ZAfix split (mirrors the zaspot.cz homepage sheet).
+            Needs the effective-prices payload (carries the ZAfix fields); while it
+            loads we show a slim spot-only fallback so the screen never looks empty. */}
+        {effectivePrices ? (
+          <PriceSheet
+            prices={effectivePrices}
+            language={language}
+            colors={colors}
+            isDark={isDark}
+            timeSlot={effectivePrices.timeSlot}
+            onPressDetails={() => router.push('/spot-prices')}
+          />
+        ) : (
+          <View style={[styles.priceCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.priceHeader}>
+              <View style={styles.priceHeaderLeft}>
+                <Text style={[styles.priceLabel, { color: colors.textSecondary }]}>
+                  {t.home.priceNow}
                 </Text>
+                <View style={[styles.liveBadge, { backgroundColor: Colors.brand.accentGreen + '20' }]}>
+                  <View style={styles.liveDot} />
+                  <Text style={styles.liveText}>LIVE</Text>
+                </View>
               </View>
             </View>
+            <View style={styles.priceMain}>
+              <Text style={[styles.priceValue, { color: getPriceColor(currentPrice) }]}>
+                {currentPrice.toFixed(2)}
+              </Text>
+              <Text style={[styles.priceUnit, { color: colors.textSecondary }]}>
+                {t.home.perKwh}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Daily spot stats (low / avg / high) + best-time-to-charge CTA */}
+        <View style={[styles.statsCard, { backgroundColor: colors.surface }]}>
+          <View style={styles.statsHeader}>
+            <Text style={[styles.statsTitle, { color: colors.text }]}>
+              {t.spotPrices.title}
+            </Text>
             <View style={styles.trendContainer}>
               <Ionicons
                 name={getTrendIcon(trend)}
-                size={20}
+                size={18}
                 color={trend === 'falling' ? Colors.spotPrice.veryLow : trend === 'rising' ? Colors.spotPrice.high : colors.textMuted}
               />
               <Text style={[
                 styles.trendText,
                 { color: trend === 'falling' ? Colors.spotPrice.veryLow : trend === 'rising' ? Colors.spotPrice.high : colors.textMuted }
               ]}>
-                {trend === 'falling' ? 'Klesá' : trend === 'rising' ? 'Stoupá' : 'Stabilní'}
+                {trend === 'falling' ? t.spotPrices.falling : trend === 'rising' ? t.spotPrices.rising : t.spotPrices.stable}
               </Text>
             </View>
           </View>
@@ -485,6 +540,10 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.xxl,
     fontWeight: 'bold',
   },
+  headerActions: {
+    flexDirection: 'row',
+    gap: Layout.spacing.sm,
+  },
   themeToggle: {
     width: 44,
     height: 44,
@@ -506,6 +565,26 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+  },
+  statsCard: {
+    borderRadius: Layout.borderRadius.xl,
+    padding: Layout.spacing.lg,
+    marginBottom: Layout.spacing.lg,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  statsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Layout.spacing.md,
+  },
+  statsTitle: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '700',
   },
   priceHeader: {
     flexDirection: 'row',

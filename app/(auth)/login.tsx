@@ -34,8 +34,18 @@ import { Layout } from '../../constants/layout';
 // this audience. iOS uses iosClientId for the native Sign-In dialog; Android
 // uses webClientId + the package's SHA-1 (registered in Google Cloud).
 GoogleSignin.configure({
-  webClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
-  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+  // Hardcoded fallbacks: OAuth client IDs are public-by-design (baked into the
+  // APK either way — protection comes from the Google Cloud package+SHA-1
+  // restriction, same rationale as the Maps key in app.config.ts). Without these
+  // the env vars are `undefined` in EAS/sideload builds (no .env, no eas.json
+  // env block) → webClientId undefined → Google login silently fails for anyone
+  // who didn't build with a local .env. The web client = backend GOOGLE_CLIENT_ID.
+  webClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB ||
+    '819686551727-dp9d0ph5hn0hql6c1lgj8en6dqoo3rsp.apps.googleusercontent.com',
+  iosClientId:
+    process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS ||
+    '819686551727-lfjt408d3liucikppjtoqpjs0l3mg2pg.apps.googleusercontent.com',
   scopes: ['profile', 'email'],
   offlineAccess: false,
 });
@@ -73,7 +83,8 @@ export default function LoginScreen() {
       const idToken: string | undefined = result?.data?.idToken ?? result?.idToken;
 
       if (!idToken) {
-        setErrors({ general: msg.network_error });
+        // Google returned no token — not a network problem.
+        setErrors({ general: msg.google_signin_failed });
         return;
       }
 
@@ -81,12 +92,31 @@ export default function LoginScreen() {
       if (r.success) {
         router.replace('/(tabs)');
       } else {
-        setErrors({ general: msg[r.error || 'invalid_credentials'] || msg.network_error });
+        setErrors({ general: msg[r.error || 'invalid_credentials'] || msg.google_signin_failed });
       }
     } catch (err: any) {
       // User cancelled — silent, not an error
       if (err?.code === statusCodes.SIGN_IN_CANCELLED || err?.code === statusCodes.IN_PROGRESS) return;
-      setErrors({ general: msg.network_error });
+
+      const code = String(err?.code ?? '');
+      if (err?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setErrors({ general: msg.play_services });
+      } else if (code === '10' || code.toUpperCase().includes('DEVELOPER')) {
+        // DEVELOPER_ERROR (code 10): the app's signing SHA-1 isn't registered with
+        // the Google OAuth client (common on sideloaded debug builds). This is NOT
+        // a connectivity issue — don't show "Connection error".
+        setErrors({
+          general: __DEV__
+            ? 'Google DEVELOPER_ERROR: app signature (SHA-1) not registered for this OAuth client'
+            : msg.google_signin_failed,
+        });
+      } else {
+        setErrors({
+          general: __DEV__
+            ? `Google sign-in error: ${code} ${err?.message ?? ''}`.trim()
+            : msg.google_signin_failed,
+        });
+      }
     } finally {
       setGoogleLoading(false);
     }
@@ -101,6 +131,8 @@ export default function LoginScreen() {
       email_invalid: 'Neplatný e-mail',
       password_required: 'Zadejte heslo',
       password_short: 'Heslo musí mít alespoň 6 znaků',
+      google_signin_failed: 'Přihlášení přes Google se nezdařilo. Zkuste to znovu nebo použijte e-mail.',
+      play_services: 'Služby Google Play nejsou dostupné nebo jsou zastaralé.',
     },
     en: {
       invalid_credentials: 'Invalid email or password',
@@ -110,6 +142,8 @@ export default function LoginScreen() {
       email_invalid: 'Invalid email',
       password_required: 'Enter your password',
       password_short: 'Password must be at least 6 characters',
+      google_signin_failed: 'Google sign-in failed. Try again or use email.',
+      play_services: 'Google Play Services unavailable or outdated.',
     },
     de: {
       invalid_credentials: 'Ungültige E-Mail oder Passwort',
@@ -119,6 +153,8 @@ export default function LoginScreen() {
       email_invalid: 'Ungültige E-Mail',
       password_required: 'Passwort eingeben',
       password_short: 'Passwort muss mindestens 6 Zeichen haben',
+      google_signin_failed: 'Google-Anmeldung fehlgeschlagen. Erneut versuchen oder E-Mail nutzen.',
+      play_services: 'Google Play Services nicht verfügbar oder veraltet.',
     },
     pl: {
       invalid_credentials: 'Nieprawidłowy e-mail lub hasło',
@@ -128,6 +164,8 @@ export default function LoginScreen() {
       email_invalid: 'Nieprawidłowy e-mail',
       password_required: 'Podaj hasło',
       password_short: 'Hasło musi mieć co najmniej 6 znaków',
+      google_signin_failed: 'Logowanie Google nie powiodło się. Spróbuj ponownie lub użyj e-maila.',
+      play_services: 'Usługi Google Play niedostępne lub nieaktualne.',
     },
   };
 

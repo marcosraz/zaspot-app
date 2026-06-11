@@ -92,7 +92,7 @@ export default function RfidTagsScreen() {
                     <Text style={[styles.tagDesc, { color: colors.textMuted }]} numberOfLines={1}>{t.description}</Text>
                   )}
                 </View>
-                <Text style={[styles.tagStatus, { color: t.status === 'active' ? Colors.brand.accentGreen : colors.error }]}>
+                <Text style={[styles.tagStatus, { color: (t.status === 'active' || t.status === 'Accepted') ? Colors.brand.accentGreen : colors.error }]}>
                   {t.status}
                 </Text>
                 <TouchableOpacity onPress={() => onDelete(t)}>
