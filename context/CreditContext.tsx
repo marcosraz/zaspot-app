@@ -27,7 +27,7 @@ interface CreditContextType {
   balanceFormatted: string;
   loading: boolean;
   refreshBalance: () => Promise<void>;
-  topUp: (amountCzk: number) => Promise<{ success: boolean; error?: string }>;
+  topUp: (amountCzk: number, payMethod?: 'GPAY' | 'APAY') => Promise<{ success: boolean; error?: string }>;
   transactions: CreditTransaction[];
   transactionsLoading: boolean;
   refreshTransactions: () => Promise<void>;
@@ -94,7 +94,10 @@ export function CreditProvider({ children }: CreditProviderProps) {
     await fetchBalance();
   }, []);
 
-  const topUp = useCallback(async (amountCzk: number): Promise<{ success: boolean; error?: string }> => {
+  const topUp = useCallback(async (
+    amountCzk: number,
+    payMethod?: 'GPAY' | 'APAY'
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
       // iOS: Apple Pay only renders in real Safari — SFSafariViewController (used
       // by WebBrowser) hides the Apple Pay button. So on iOS we hand off to Safari
@@ -110,7 +113,13 @@ export function CreditProvider({ children }: CreditProviderProps) {
           // Backend expects snake_case `amount_czk` (see app/api/payment/create/route.ts)
           // client:'app' only on iOS — it drives the Safari return-marker + the
           // CIT `completed` shortcut. Android keeps its Custom-Tabs flow unchanged.
-          body: JSON.stringify({ amount_czk: amountCzk, client: useSafari ? 'app' : undefined }),
+          // pay_method narrows GP's PAYMETHODS to one wallet (dedicated
+          // Google Pay / Apple Pay buttons on the top-up screen).
+          body: JSON.stringify({
+            amount_czk: amountCzk,
+            client: useSafari ? 'app' : undefined,
+            pay_method: payMethod,
+          }),
           requireAuth: true,
         }
       );

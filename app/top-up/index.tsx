@@ -16,6 +16,7 @@ import {
   Share,
   Image,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,7 +88,7 @@ export default function TopUpScreen() {
     }
   }, [isEur]);
 
-  const handleCard = async () => {
+  const handleCard = async (payMethod?: 'GPAY' | 'APAY') => {
     const amount = getAmount();
     if (!amount || amount < MIN_AMOUNT) {
       Alert.alert('Minimální částka', `Minimum ${MIN_AMOUNT} Kč`);
@@ -98,7 +99,7 @@ export default function TopUpScreen() {
       return;
     }
     setSubmitting(true);
-    const result = await topUp(amount);
+    const result = await topUp(amount, payMethod);
     setSubmitting(false);
     if (!result.success) {
       Alert.alert('Platbu se nepodařilo zahájit', result.error || 'Zkuste to prosím znovu.');
@@ -106,6 +107,12 @@ export default function TopUpScreen() {
       await refreshBalance();
     }
   };
+
+  // Dedicated wallet button: Google Pay on Android, Apple Pay on iOS. Narrows
+  // the GP hosted page to that single wallet (PAYMETHODS=GPAY/APAY) and skips
+  // the saved-card fast path server-side.
+  const walletMethod: 'GPAY' | 'APAY' = Platform.OS === 'ios' ? 'APAY' : 'GPAY';
+  const handleWallet = () => handleCard(walletMethod);
 
   const handleTransferGenerate = async () => {
     const amount = getAmount();
@@ -210,7 +217,7 @@ export default function TopUpScreen() {
               />
 
               <TouchableOpacity
-                onPress={handleCard}
+                onPress={() => handleCard()}
                 disabled={submitting || !getAmount()}
                 style={[styles.primaryBtn, { backgroundColor: Colors.brand.accentGreen, opacity: (submitting || !getAmount()) ? 0.55 : 1 }]}
               >
@@ -223,10 +230,27 @@ export default function TopUpScreen() {
                   </>
                 )}
               </TouchableOpacity>
+
+              {/* Wallet button — Google Pay (Android) / Apple Pay (iOS), brand-black */}
+              <TouchableOpacity
+                onPress={handleWallet}
+                disabled={submitting || !getAmount()}
+                style={[styles.walletBtn, { opacity: (submitting || !getAmount()) ? 0.55 : 1 }]}
+              >
+                <Ionicons
+                  name={walletMethod === 'APAY' ? 'logo-apple' : 'logo-google'}
+                  size={18}
+                  color="#fff"
+                />
+                <Text style={styles.walletBtnText}>
+                  {walletMethod === 'APAY' ? 'Apple Pay' : 'Google Pay'}
+                </Text>
+              </TouchableOpacity>
+
               <Text style={[styles.hint, { color: colors.textMuted }]}>
-                Po stisknutí „Dobít" se otevře zabezpečená platební brána, kde
-                můžete zaplatit kartou (Visa, Mastercard) nebo přes Google Pay /
-                Apple Pay.
+                „Dobít" otevře zabezpečenou platební bránu s výběrem karty
+                (Visa, Mastercard) i peněženek. Tlačítko {walletMethod === 'APAY' ? 'Apple Pay' : 'Google Pay'} přejde
+                rovnou na platbu peněženkou.
               </Text>
             </>
           )}
@@ -469,6 +493,9 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 10, padding: 14, fontSize: 18, fontWeight: '600' },
 
   primaryBtn: { flexDirection: 'row', gap: 8, padding: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  // Wallet-brand button: both Google Pay and Apple Pay guidelines use solid black
+  walletBtn: { flexDirection: 'row', gap: 8, padding: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 10, backgroundColor: '#000000' },
+  walletBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   secondaryBtn: { flexDirection: 'row', gap: 6, padding: 10, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   secondaryBtnText: { fontSize: 14, fontWeight: '600' },
