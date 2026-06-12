@@ -32,6 +32,8 @@ import { fetchEmpStations } from '../../lib/v2Features';
 import { openNavigationTo } from '../../lib/navigation';
 import FavoriteButton from '../../components/FavoriteButton';
 import { LiveStationPrice } from '../../components/LiveStationPrice';
+import { loadPriceContext, getStationPriceCzk, sortByPrice, PriceContext } from '../../lib/stationPrices';
+import { calculateDistance } from '../../lib/routePlanner';
 
 // Region type
 type Region = {
@@ -75,7 +77,13 @@ export default function MapScreen() {
     freeParking: false,
     connectorType: null as string | null,
     minPower: 0,
+    // Max price in CZK/kWh (0 = off). Stations without a published price are
+    // excluded while this filter is active — "unknown" is not "cheap".
+    maxPrice: 0,
   });
+  // Live prices for sorting/filtering (ZAspot bulk prices + EUR/CZK rate)
+  const [priceCtx, setPriceCtx] = useState<PriceContext | null>(null);
+  const [showCheapest, setShowCheapest] = useState(false);
 
   // Default: Czech Republic center
   const [region, setRegion] = useState<Region>({
@@ -88,6 +96,7 @@ export default function MapScreen() {
   useEffect(() => {
     loadStations();
     requestLocationPermission();
+    loadPriceContext().then(setPriceCtx).catch(() => {});
   }, []);
 
   const loadStations = async () => {
@@ -124,40 +133,72 @@ export default function MapScreen() {
     }
   };
 
-  // Load Hubject roaming stations only once when the user switches to 'Vše'
-  useEffect(() => {
-    if (networkFilter !== 'all' || empStations.length > 0 || empLoading) return;
+  // ── Hubject roaming stations: loaded PER MAP VIEWPORT (like the web map).
+  // The full Hubject set is ~53k stations; a single radius fetch capped at a
+  // few hundred rows left the map looking empty. Instead Leaflet reports its
+  // bounds after every pan/zoom and we fetch up to 1000 stations for exactly
+  // that box, merging into a session cache so panning back is instant.
+  const EMP_MIN_ZOOM = 8; // below this a viewport spans whole countries — skip
+  const empCacheRef = useRef<Map<string, ChargingStation>>(new Map());
+  const empDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const networkFilterRef = useRef(networkFilter);
+  networkFilterRef.current = networkFilter;
+
+  const mapEmpToStation = (s: import('../../lib/v2Features').EmpStation): ChargingStation => ({
+    id: 'emp-' + s.evse_id,
+    name: s.name,
+    address: s.address,
+    city: null,
+    postal_code: null,
+    country: 'EU',
+    latitude: s.latitude,
+    longitude: s.longitude,
+    type: s.max_power_kw >= 50 ? 'DC' : 'AC',
+    power_kw: s.max_power_kw,
+    price_per_kwh: s.price_per_kwh,
+    available: s.status === 'available',
+    status: s.status === 'available' ? 'operational' : 'offline',
+    operator: s.operator,
+    operator_phone: null,
+    connector_types: s.connectors.map((c) => c.type),
+    num_connectors: s.connectors.length,
+    access_hours: '24/7',
+    parking_fee: false,
+    description: null,
+  });
+
+  const loadEmpForBounds = useCallback((b: { west: number; south: number; east: number; north: number }) => {
     setEmpLoading(true);
-    fetchEmpStations({ lat: 49.8175, lng: 15.4730, radius_km: 600 })
+    fetchEmpStations({ bounds: `${b.west},${b.south},${b.east},${b.north}`, limit: 1000 })
       .then((res) => {
         if (res.ok && res.data?.success) {
-          const mapped: ChargingStation[] = res.data.stations.map((s) => ({
-            id: 'emp-' + s.evse_id,
-            name: s.name,
-            address: s.address,
-            city: null,
-            postal_code: null,
-            country: 'EU',
-            latitude: s.latitude,
-            longitude: s.longitude,
-            type: s.max_power_kw >= 50 ? 'DC' : 'AC',
-            power_kw: s.max_power_kw,
-            price_per_kwh: s.price_per_kwh,
-            available: s.status === 'available',
-            status: s.status === 'available' ? 'operational' : 'offline',
-            operator: s.operator,
-            operator_phone: null,
-            connector_types: s.connectors.map((c) => c.type),
-            num_connectors: s.connectors.length,
-            access_hours: '24/7',
-            parking_fee: false,
-            description: null,
-          }));
-          setEmpStations(mapped);
+          const cache = empCacheRef.current;
+          res.data.stations.forEach((s) => {
+            const st = mapEmpToStation(s);
+            cache.set(st.id, st);
+          });
+          setEmpStations(Array.from(cache.values()));
         }
       })
       .finally(() => setEmpLoading(false));
-  }, [networkFilter]);
+  }, []);
+
+  const onMapBounds = useCallback((msg: { west: number; south: number; east: number; north: number; zoom: number }) => {
+    if (networkFilterRef.current !== 'all') return;
+    if (msg.zoom < EMP_MIN_ZOOM) return;
+    if (empDebounceRef.current) clearTimeout(empDebounceRef.current);
+    empDebounceRef.current = setTimeout(() => loadEmpForBounds(msg), 500);
+  }, [loadEmpForBounds]);
+
+  // Switching to 'Vše' → ask Leaflet for its current viewport to trigger the
+  // first roaming fetch (and seed a wide CZ box as fallback while zoomed out)
+  useEffect(() => {
+    if (networkFilter !== 'all') return;
+    webViewRef.current?.injectJavaScript('window.requestBounds && window.requestBounds(); true;');
+    if (empCacheRef.current.size === 0) {
+      loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 }); // CZ-wide seed
+    }
+  }, [networkFilter, loadEmpForBounds]);
 
   const getMarkerColor = (station: ChargingStation) => {
     if (station.status !== 'operational') return Colors.marker.offline;
@@ -167,7 +208,7 @@ export default function MapScreen() {
 
   const hasActiveFilters = filters.dcOnly || filters.acOnly || filters.availableOnly
     || filters.favoritesOnly || filters.freeParking || filters.connectorType !== null
-    || filters.minPower > 0;
+    || filters.minPower > 0 || filters.maxPrice > 0;
 
   const resetFilters = () => setFilters({
     dcOnly: false,
@@ -177,6 +218,7 @@ export default function MapScreen() {
     freeParking: false,
     connectorType: null,
     minPower: 0,
+    maxPrice: 0,
   });
 
   // Combine stations based on network filter
@@ -207,6 +249,10 @@ export default function MapScreen() {
     if (filters.freeParking && station.parking_fee !== false) return false;
     if (filters.connectorType && !station.connector_types?.includes(filters.connectorType)) return false;
     if (station.power_kw < filters.minPower) return false;
+    if (filters.maxPrice > 0) {
+      const p = priceCtx ? getStationPriceCzk(station, priceCtx) : null;
+      if (p == null || p > filters.maxPrice) return false;
+    }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -217,6 +263,42 @@ export default function MapScreen() {
     }
     return true;
   });
+
+  // "Nejlevnější v okolí" — filtered stations within 30 km of the user
+  // (whole filtered set as fallback without GPS), price-ascending, top 20.
+  const cheapestNearby = useMemo(() => {
+    if (!priceCtx) return [];
+    let pool = filteredStations;
+    if (location) {
+      pool = pool.filter(
+        (s) =>
+          calculateDistance(
+            location.coords.latitude, location.coords.longitude,
+            Number(s.latitude), Number(s.longitude)
+          ) <= 30
+      );
+    }
+    return sortByPrice(pool, priceCtx)
+      .filter((e) => e.priceCzk != null)
+      .slice(0, 20)
+      .map((e) => ({
+        ...e,
+        distanceKm: location
+          ? calculateDistance(
+              location.coords.latitude, location.coords.longitude,
+              Number(e.station.latitude), Number(e.station.longitude)
+            )
+          : null,
+      }));
+  }, [filteredStations, priceCtx, location]);
+
+  const focusStation = (station: ChargingStation) => {
+    setShowCheapest(false);
+    setSelectedStation(station);
+    webViewRef.current?.injectJavaScript(
+      `map.setView([${Number(station.latitude)}, ${Number(station.longitude)}], 14); true;`
+    );
+  };
 
   const centerOnLocation = () => {
     if (location && webViewRef.current) {
@@ -329,6 +411,21 @@ export default function MapScreen() {
     });
     markerCluster.addLayers(markers);
   };
+
+  // Report the visible viewport after every pan/zoom (and on demand) so RN can
+  // lazy-load Hubject roaming stations for exactly this area — the full set is
+  // ~53k rows, far too many to ship at once.
+  function postBounds() {
+    const b = map.getBounds();
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'bounds',
+      west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth(),
+      zoom: map.getZoom(),
+    }));
+  }
+  map.on('moveend', postBounds);
+  window.requestBounds = postBounds;
+
   window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
 </script>
 </body></html>`,
@@ -339,6 +436,7 @@ export default function MapScreen() {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
       if (msg.type === 'ready') setMapStatus('loaded');
+      else if (msg.type === 'bounds') onMapBounds(msg);
       else if (msg.type === 'marker' && msg.id) {
         const found = filteredStations.find((s) => s.id === msg.id);
         if (found) setSelectedStation(found);
@@ -456,6 +554,17 @@ export default function MapScreen() {
               {filteredStations.length} {t.map.allStations.toLowerCase()}
             </Text>
           </View>
+
+          {/* Cheapest-nearby list */}
+          <TouchableOpacity
+            style={[styles.cheapestBtn, { backgroundColor: colors.surface }]}
+            onPress={() => setShowCheapest(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Nejlevnější stanice v okolí"
+          >
+            <Ionicons name="cash-outline" size={16} color={Colors.brand.accentGreen} />
+            <Text style={[styles.countText, { color: colors.text }]}>Nejlevnější</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Offline Indicator */}
@@ -595,7 +704,13 @@ export default function MapScreen() {
               <LiveStationPrice
                 chargePointId={selectedStation.external_id}
                 isDc={selectedStation.type === 'DC'}
-                fallbackPriceCzkKwh={selectedStation.price_per_kwh}
+                // Normalized CZK price: Hubject stations store EUR — passing it
+                // raw displayed e.g. "0.49" under a "Kč/kWh" label.
+                fallbackPriceCzkKwh={
+                  priceCtx
+                    ? getStationPriceCzk(selectedStation, priceCtx)
+                    : selectedStation.price_per_kwh
+                }
                 textColor={colors.text}
                 labelColor={colors.textMuted}
               />
@@ -647,6 +762,65 @@ export default function MapScreen() {
           </View>
         </View>
       )}
+
+      {/* Cheapest-nearby bottom sheet */}
+      <Modal
+        visible={showCheapest}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowCheapest(false)}
+      >
+        <View style={styles.cheapestBackdrop}>
+          <View style={[styles.cheapestSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.cheapestHandle} />
+            <View style={styles.cheapestHeader}>
+              <Ionicons name="cash-outline" size={20} color={Colors.brand.accentGreen} />
+              <Text style={[styles.cheapestTitle, { color: colors.text }]}>
+                Nejlevnější {location ? 'v okolí (30 km)' : 'stanice'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowCheapest(false)}>
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {!priceCtx ? (
+              <ActivityIndicator color={Colors.brand.accentGreen} style={{ padding: 24 }} />
+            ) : cheapestNearby.length === 0 ? (
+              <Text style={[styles.cheapestEmpty, { color: colors.textMuted }]}>
+                Žádné stanice se zveřejněnou cenou
+                {networkFilter === 'zaspot' ? '. Zkuste přepnout na „Vše".' : ' v této oblasti.'}
+              </Text>
+            ) : (
+              <ScrollView style={{ maxHeight: 420 }}>
+                {cheapestNearby.map(({ station, priceCzk, distanceKm }, idx) => (
+                  <TouchableOpacity
+                    key={station.id}
+                    style={[styles.cheapestRow, { borderBottomColor: colors.borderLight }]}
+                    onPress={() => focusStation(station)}
+                  >
+                    <View style={[styles.cheapestRank, idx === 0 && { backgroundColor: Colors.brand.accentGreen }]}>
+                      <Text style={[styles.cheapestRankText, idx === 0 && { color: '#fff' }]}>{idx + 1}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.cheapestName, { color: colors.text }]} numberOfLines={1}>
+                        {station.name}
+                      </Text>
+                      <Text style={[styles.cheapestMeta, { color: colors.textMuted }]} numberOfLines={1}>
+                        {station.is_ocpp ? 'ZAspot' : (String(station.id).startsWith('emp-') ? 'Roaming' : station.operator || '—')}
+                        {' · '}{station.power_kw} kW
+                        {distanceKm != null ? ` · ${distanceKm.toFixed(1)} km` : ''}
+                      </Text>
+                    </View>
+                    <Text style={styles.cheapestPrice}>
+                      {priceCzk!.toFixed(2)} Kč
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Filter Modal */}
       <Modal
@@ -823,6 +997,40 @@ export default function MapScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
+
+              {/* Max Price (CZK/kWh) — stations without a published price are
+                  hidden while this is active */}
+              <View style={styles.filterSection}>
+                <Text style={[styles.filterSectionTitle, { color: colors.text }]}>
+                  Max. cena: {filters.maxPrice > 0 ? `${filters.maxPrice} Kč/kWh` : '—'}
+                </Text>
+                <View style={styles.powerButtons}>
+                  {[0, 6, 8, 10, 12, 15].map(price => (
+                    <TouchableOpacity
+                      key={price}
+                      style={[
+                        styles.powerButton,
+                        { borderColor: colors.border },
+                        filters.maxPrice === price && {
+                          backgroundColor: Colors.brand.accentGreen,
+                          borderColor: Colors.brand.accentGreen
+                        }
+                      ]}
+                      onPress={() => setFilters({ ...filters, maxPrice: price })}
+                    >
+                      <Text style={[
+                        styles.powerButtonText,
+                        { color: filters.maxPrice === price ? '#FFFFFF' : colors.text }
+                      ]}>
+                        {price === 0 ? t.map.allTypes : `≤${price}`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text style={[styles.filterHint, { color: colors.textMuted }]}>
+                  Stanice bez zveřejněné ceny jsou při aktivním filtru skryté.
+                </Text>
               </View>
             </ScrollView>
 
@@ -1287,5 +1495,90 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  filterHint: {
+    fontSize: 12,
+    marginTop: 8,
+  },
+  cheapestBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+  },
+  cheapestBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  cheapestSheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Layout.spacing.lg,
+    paddingBottom: 34,
+  },
+  cheapestHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.4)',
+    marginBottom: 12,
+  },
+  cheapestHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  cheapestTitle: {
+    flex: 1,
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  cheapestEmpty: {
+    fontSize: 14,
+    paddingVertical: 24,
+    textAlign: 'center',
+  },
+  cheapestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  cheapestRank: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(128,128,128,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cheapestRankText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#6B7280',
+  },
+  cheapestName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cheapestMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  cheapestPrice: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#16A34A',
   },
 });

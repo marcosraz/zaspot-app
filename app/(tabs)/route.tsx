@@ -45,6 +45,12 @@ export default function RouteScreen() {
   const [batteryLevel, setBatteryLevel] = useState(settings.currentBatteryPercent);
   const [vehicleRange, setVehicleRange] = useState(activeVehicle?.rangeKm ?? 400);
   const [isCalculating, setIsCalculating] = useState(false);
+  // Stop-selection preferences (user request: filter trip chargers by network,
+  // price and power — "die billigsten raussuchen")
+  const [includeRoaming, setIncludeRoaming] = useState(true);
+  const [preferCheapest, setPreferCheapest] = useState(false);
+  const [minPowerKw, setMinPowerKw] = useState(0);
+  const [maxPriceCzkKwh, setMaxPriceCzkKwh] = useState(0);
   const [isLocating, setIsLocating] = useState(false);
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +145,13 @@ export default function RouteScreen() {
         vehicleRange,
         activeVehicle?.batteryCapacityKwh ?? 60,
         activeVehicle?.maxChargingPowerKw,
-        activeVehicle?.connectorType
+        activeVehicle?.connectorType,
+        {
+          network: includeRoaming ? 'all' : 'zaspot',
+          preferCheapest,
+          minPowerKw,
+          maxPriceCzkKwh,
+        }
       );
       setRouteResult(result);
     } catch (err) {
@@ -307,6 +319,79 @@ export default function RouteScreen() {
             )}
           </View>
 
+          {/* Charging-stop preferences */}
+          <View style={[styles.optionsCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.optionsTitle, { color: colors.text }]}>Nabíjecí zastávky</Text>
+
+            <View style={styles.optionsTogglesRow}>
+              <TouchableOpacity
+                style={[styles.optionToggle, includeRoaming && styles.optionToggleActive, { borderColor: includeRoaming ? Colors.brand.accentGreen : colors.border }]}
+                onPress={() => setIncludeRoaming(!includeRoaming)}
+              >
+                <Ionicons
+                  name={includeRoaming ? 'checkbox' : 'square-outline'}
+                  size={18}
+                  color={includeRoaming ? Colors.brand.accentGreen : colors.textMuted}
+                />
+                <Text style={[styles.optionToggleText, { color: colors.text }]}>Včetně roamingu</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.optionToggle, preferCheapest && styles.optionToggleActive, { borderColor: preferCheapest ? Colors.brand.accentGreen : colors.border }]}
+                onPress={() => setPreferCheapest(!preferCheapest)}
+              >
+                <Ionicons
+                  name={preferCheapest ? 'checkbox' : 'square-outline'}
+                  size={18}
+                  color={preferCheapest ? Colors.brand.accentGreen : colors.textMuted}
+                />
+                <Text style={[styles.optionToggleText, { color: colors.text }]}>Preferovat nejlevnější</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>
+              Min. výkon: {minPowerKw > 0 ? `${minPowerKw} kW` : 'vše'}
+            </Text>
+            <View style={styles.optionChipsRow}>
+              {[0, 50, 100, 150].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.optionChip,
+                    { borderColor: colors.border },
+                    minPowerKw === p && { backgroundColor: Colors.brand.accentGreen, borderColor: Colors.brand.accentGreen },
+                  ]}
+                  onPress={() => setMinPowerKw(p)}
+                >
+                  <Text style={[styles.optionChipText, { color: minPowerKw === p ? '#fff' : colors.text }]}>
+                    {p === 0 ? 'vše' : `${p}+`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={[styles.optionLabel, { color: colors.textSecondary }]}>
+              Max. cena: {maxPriceCzkKwh > 0 ? `${maxPriceCzkKwh} Kč/kWh` : 'bez limitu'}
+            </Text>
+            <View style={styles.optionChipsRow}>
+              {[0, 8, 10, 12, 15].map((p) => (
+                <TouchableOpacity
+                  key={p}
+                  style={[
+                    styles.optionChip,
+                    { borderColor: colors.border },
+                    maxPriceCzkKwh === p && { backgroundColor: Colors.brand.accentGreen, borderColor: Colors.brand.accentGreen },
+                  ]}
+                  onPress={() => setMaxPriceCzkKwh(p)}
+                >
+                  <Text style={[styles.optionChipText, { color: maxPriceCzkKwh === p ? '#fff' : colors.text }]}>
+                    {p === 0 ? 'vše' : `≤${p}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           {/* Error Message */}
           {error && (
             <View style={styles.errorContainer}>
@@ -466,6 +551,7 @@ export default function RouteScreen() {
                       </Text>
                       <Text style={[styles.stopCostValue, { color: Colors.brand.accentGreen }]}>
                         {format(stop.chargeCost)}
+                        {stop.pricePerKwh != null ? `  (${stop.pricePerKwh.toFixed(2)} Kč/kWh)` : ''}
                       </Text>
                     </View>
 
@@ -815,5 +901,57 @@ const styles = StyleSheet.create({
     fontSize: Layout.fontSize.md,
     textAlign: 'center',
     paddingHorizontal: Layout.spacing.xl,
+  },
+  optionsCard: {
+    borderRadius: Layout.borderRadius.xl,
+    padding: Layout.spacing.md,
+    marginBottom: Layout.spacing.md,
+  },
+  optionsTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  optionsTogglesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  optionToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  optionToggleActive: {
+    backgroundColor: 'rgba(22,163,74,0.08)',
+  },
+  optionToggleText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  optionLabel: {
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  optionChipsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  optionChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  optionChipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

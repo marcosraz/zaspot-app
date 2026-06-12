@@ -536,16 +536,21 @@ export async function fetchEmpStations(params?: {
   lat?: number;
   lng?: number;
   radius_km?: number;
+  /** Map viewport "west,south,east,north" — preferred over lat/radius for the
+   *  map, mirrors the web charging-map. Server caps limit at 1000. */
+  bounds?: string;
+  limit?: number;
 }): Promise<{ ok: boolean; status: number; data: { success: boolean; stations: EmpStation[] } }> {
   const qs = new URLSearchParams();
   // The route reads lat/lon/radius (NOT lng/radius_km). With the wrong names the
   // geo filter never activated → full-table scan of ~53k rows → the request hung
   // and the screen spun forever. Use the correct names + a hard limit so it hits
   // the (geo_lat, geo_lon) index and returns only the nearby bounding box.
+  if (params?.bounds) qs.set('bounds', params.bounds);
   if (params?.lat != null) qs.set('lat', String(params.lat));
   if (params?.lng != null) qs.set('lon', String(params.lng));
   if (params?.radius_km != null) qs.set('radius', String(params.radius_km));
-  qs.set('limit', '300');
+  qs.set('limit', String(params?.limit ?? 300));
   const q = qs.toString();
   const res = await apiFetch<{ success: boolean; stations: any[] }>(
     `/emp/stations${q ? '?' + q : ''}`,

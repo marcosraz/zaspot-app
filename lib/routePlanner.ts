@@ -4,6 +4,21 @@
 
 import { ChargingStation, fetchNearbyStations } from './stations';
 import { getCompatibleConnectors } from '../constants/vehiclePresets';
+import { fetchEmpStations } from './v2Features';
+import { loadPriceContext, getStationPriceCzk, PriceContext } from './stationPrices';
+
+export interface RoutePlanOptions {
+  /** 'all' adds Hubject roaming stations along the corridor (chargeable via
+   *  the app since the EMP go-live); 'zaspot' restricts to our network. */
+  network?: 'zaspot' | 'all';
+  /** Weight price into stop selection instead of pure DC/power scoring. */
+  preferCheapest?: boolean;
+  /** Only consider chargers with at least this power. */
+  minPowerKw?: number;
+  /** Skip stations costlier than this (stations without a published price
+   *  are kept — dropping them would empty rural corridors). */
+  maxPriceCzkKwh?: number;
+}
 
 export interface RoutePoint {
   latitude: number;
@@ -18,6 +33,8 @@ export interface ChargingStop {
   chargeToPercent: number;    // %
   chargeTime: number;         // minutes
   chargeCost: number;         // CZK
+  /** Effective price used for the cost estimate (CZK/kWh), null if unknown */
+  pricePerKwh: number | null;
 }
 
 export interface RouteResult {
@@ -104,7 +121,8 @@ export async function planRoute(
   vehicleRangeKm: number,
   batteryCapacityKwh: number = 60,
   maxChargingPowerKw?: number,
-  connectorType?: string
+  connectorType?: string,
+  options: RoutePlanOptions = {}
 ): Promise<RouteResult> {
   const totalDistance = calculateDistance(
     from.latitude,
@@ -144,7 +162,66 @@ export async function planRoute(
   const midLon = (from.longitude + to.longitude) / 2;
   const searchRadius = Math.max(totalDistance * 0.6, 50); // Search in corridor
 
-  const allStations = await fetchNearbyStations(midLat, midLon, searchRadius);
+  // Price context for filtering/scoring/cost — non-fatal if it fails
+  const priceCtx: PriceContext | null = await loadPriceContext().catch(() => null);
+
+  let allStations = await fetchNearbyStations(midLat, midLon, searchRadius);
+
+  // 'all': add Hubject roaming stations from a bounding box around the route
+  // (padded ~0.3° ≈ 25 km). They are startable from the app since the EMP
+  // go-live, so they are legitimate stops.
+  if (options.network === 'all') {
+    const pad = 0.3;
+    const west = Math.min(from.longitude, to.longitude) - pad;
+    const east = Math.max(from.longitude, to.longitude) + pad;
+    const south = Math.min(from.latitude, to.latitude) - pad;
+    const north = Math.max(from.latitude, to.latitude) + pad;
+    const empRes = await fetchEmpStations({
+      bounds: `${west},${south},${east},${north}`,
+      limit: 1000,
+    }).catch(() => null);
+    if (empRes?.ok && empRes.data?.success) {
+      const seen = new Set(allStations.map((s) => s.id));
+      const empMapped: ChargingStation[] = empRes.data.stations
+        .map((s) => ({
+          id: 'emp-' + s.evse_id,
+          name: s.name,
+          address: s.address,
+          city: null,
+          postal_code: null,
+          country: 'EU',
+          latitude: s.latitude,
+          longitude: s.longitude,
+          type: (s.max_power_kw >= 50 ? 'DC' : 'AC') as 'AC' | 'DC',
+          power_kw: s.max_power_kw,
+          price_per_kwh: s.price_per_kwh,
+          available: s.status === 'available',
+          status: (s.status === 'available' ? 'operational' : 'offline') as ChargingStation['status'],
+          operator: s.operator,
+          operator_phone: null,
+          connector_types: s.connectors.map((c) => c.type),
+          num_connectors: s.connectors.length,
+          access_hours: '24/7',
+          parking_fee: false,
+          description: null,
+        }))
+        .filter((s) => !seen.has(s.id));
+      allStations = [...allStations, ...empMapped];
+    }
+  }
+
+  // User-selected constraints: minimum power + maximum price. Stations with
+  // NO published price survive the price filter (dropping them would empty
+  // rural corridors), but preferCheapest scoring ranks priced ones higher.
+  if (options.minPowerKw && options.minPowerKw > 0) {
+    allStations = allStations.filter((s) => s.power_kw >= options.minPowerKw!);
+  }
+  if (options.maxPriceCzkKwh && options.maxPriceCzkKwh > 0 && priceCtx) {
+    allStations = allStations.filter((s) => {
+      const p = getStationPriceCzk(s, priceCtx);
+      return p == null || p <= options.maxPriceCzkKwh!;
+    });
+  }
 
   // Filter by connector compatibility
   const compatibleConnectors = connectorType ? getCompatibleConnectors(connectorType) : null;
@@ -216,12 +293,21 @@ export async function planRoute(
       break;
     }
 
-    // Pick the best station (prefer DC fast chargers, higher power)
-    const bestStation = reachableStations.reduce((best, current) => {
-      const score = (current.type === 'DC' ? 100 : 0) + current.power_kw;
-      const bestScore = (best.type === 'DC' ? 100 : 0) + best.power_kw;
-      return score > bestScore ? current : best;
-    });
+    // Pick the best station. Base score favors DC fast chargers + power; with
+    // preferCheapest every Kč/kWh costs 25 points (≈ a 10-Kč-cheaper station
+    // outweighs a 250-kW-stronger one) and unpriced stations get a flat
+    // penalty so a known-cheap charger beats an unknown one.
+    const scoreStation = (s: ChargingStation): number => {
+      let score = (s.type === 'DC' ? 100 : 0) + s.power_kw;
+      if (options.preferCheapest && priceCtx) {
+        const p = getStationPriceCzk(s, priceCtx);
+        score += p != null ? -p * 25 : -150;
+      }
+      return score;
+    };
+    const bestStation = reachableStations.reduce((best, current) =>
+      scoreStation(current) > scoreStation(best) ? current : best
+    );
 
     // Calculate stop details
     const distToStation = calculateDistance(
@@ -252,7 +338,10 @@ export async function planRoute(
       maxChargingPowerKw
     );
 
-    const pricePerKwh = bestStation.price_per_kwh || 8; // Default price
+    // Real comparable price (ZAspot live tariff / Hubject EUR→CZK / public DB);
+    // 8 Kč/kWh as the estimate when the operator publishes nothing.
+    const knownPrice = priceCtx ? getStationPriceCzk(bestStation, priceCtx) : null;
+    const pricePerKwh = knownPrice ?? bestStation.price_per_kwh ?? 8;
     const energyCharged = (chargeAmount / 100) * batteryCapacityKwh;
     const chargeCost = energyCharged * pricePerKwh;
 
@@ -263,6 +352,7 @@ export async function planRoute(
       chargeToPercent: Math.round(arrivalBattery + chargeAmount),
       chargeTime: Math.round(chargeTime),
       chargeCost: Math.round(chargeCost),
+      pricePerKwh: knownPrice,
     });
 
     totalChargingTime += chargeTime;
