@@ -26,6 +26,7 @@ import { Layout } from '../../constants/layout';
 import { getLocale } from '../../constants/translations';
 import { useNotifications } from '../../context/NotificationsContext';
 import { Reservation, fetchReservations, cancelReservation } from '../../lib/reservations';
+import { formatDbDate, parseDbDateMs } from '../../lib/dates';
 
 export default function ReservationsScreen() {
   const { colors } = useTheme();
@@ -48,10 +49,12 @@ export default function ReservationsScreen() {
     setReservations(data);
     setLoading(false);
 
-    // Schedule reminders for upcoming confirmed reservations
-    const now = new Date();
+    // Schedule reminders for upcoming confirmed reservations.
+    // parseDbDateMs: Postgres timestamps are NaN under bare new Date() on
+    // Hermes — NaN > now is always false, so reminders silently never fired.
+    const nowMs = Date.now();
     data
-      .filter(r => ['pending', 'confirmed'].includes(r.status) && new Date(r.start_time) > now)
+      .filter(r => ['pending', 'confirmed'].includes(r.status) && parseDbDateMs(r.start_time) > nowMs)
       .forEach(r => scheduleReservationReminder(r.id, r.charge_point_name, r.start_time));
   }, [isAuthenticated, scheduleReservationReminder]);
 
@@ -88,12 +91,14 @@ export default function ReservationsScreen() {
     );
   };
 
-  const now = new Date();
+  // NaN comparisons are always false → with bare new Date() every reservation
+  // fell into "past" on Hermes. parseDbDateMs keeps the buckets correct.
+  const nowMs = Date.now();
   const upcoming = reservations.filter(r =>
-    ['pending', 'confirmed', 'active'].includes(r.status) && new Date(r.end_time) > now
+    ['pending', 'confirmed', 'active'].includes(r.status) && parseDbDateMs(r.end_time) > nowMs
   );
   const past = reservations.filter(r =>
-    ['completed', 'cancelled', 'expired'].includes(r.status) || new Date(r.end_time) <= now
+    ['completed', 'cancelled', 'expired'].includes(r.status) || !(parseDbDateMs(r.end_time) > nowMs)
   );
 
   const currentData = activeTab === 'upcoming' ? upcoming : past;
@@ -110,15 +115,13 @@ export default function ReservationsScreen() {
     }
   };
 
-  const formatDateTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(getLocale(language), {
+  const formatDateTime = (dateStr: string) =>
+    formatDbDate(dateStr, getLocale(language), {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
 
   if (!isAuthenticated) {
     return (

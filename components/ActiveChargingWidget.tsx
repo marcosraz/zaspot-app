@@ -21,6 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useAuth } from '../context/AuthContext';
 import { fetchUserTransactions, UserTransaction, formatDuration, formatEnergy } from '../lib/charging';
+import { parseDbDateMs } from '../lib/dates';
 import { Layout } from '../constants/layout';
 import PressableScale from './ui/PressableScale';
 
@@ -65,9 +66,7 @@ export default function ActiveChargingWidget() {
     if (!session) return;
 
     const updateElapsed = () => {
-      // Postgres returns "YYYY-MM-DD HH:MM:SS+00" (space, no 'T'); Hermes's Date
-      // parser returns NaN for that → duration showed "—". Normalize to ISO.
-      const start = new Date(session.startTimestamp.replace(' ', 'T')).getTime();
+      const start = parseDbDateMs(session.startTimestamp);
       const now = Date.now();
       const mins = (now - start) / 60_000;
       setElapsed(formatDuration(mins));

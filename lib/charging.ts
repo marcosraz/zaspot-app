@@ -208,7 +208,9 @@ export function getConnectorStatusColor(status: string): string {
  */
 export function formatDuration(minutes: number): string {
   // Guard against NaN/undefined — caller may compute duration from missing timestamps.
-  if (!Number.isFinite(minutes) || minutes <= 0) return '—';
+  // 0 is a VALID value (sub-minute session rounded down); `<= 0` swallowed it
+  // as '—' before the '<1 min' branch could ever fire.
+  if (!Number.isFinite(minutes) || minutes < 0) return '—';
   if (minutes < 1) return '<1 min';
   if (minutes < 60) return `${Math.round(minutes)} min`;
   const h = Math.floor(minutes / 60);

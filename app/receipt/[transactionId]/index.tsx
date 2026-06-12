@@ -30,6 +30,7 @@ import { Layout } from '../../../constants/layout';
 import { getLocale } from '../../../constants/translations';
 import { apiFetch } from '../../../lib/api';
 import { formatDuration, formatEnergy } from '../../../lib/charging';
+import { formatDbDate, formatDbTime } from '../../../lib/dates';
 
 interface ReceiptData {
   id: string;
@@ -81,22 +82,13 @@ export default function ReceiptScreen() {
     loadReceipt();
   }, [transactionId]);
 
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(getLocale(language), {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-  };
+  // parseDbDate normalizes Postgres "YYYY-MM-DD HH:MM:SS+00" — bare
+  // `new Date()` returns NaN on Hermes and rendered "Invalid Date" here.
+  const formatDate = (dateStr: string) =>
+    formatDbDate(dateStr, getLocale(language), { day: 'numeric', month: 'long', year: 'numeric' });
 
-  const formatTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleTimeString(getLocale(language), {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const formatTime = (dateStr: string) =>
+    formatDbTime(dateStr, getLocale(language), { hour: '2-digit', minute: '2-digit' });
 
   const handleShare = async () => {
     if (!receipt) return;

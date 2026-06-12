@@ -24,6 +24,7 @@ import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { getLocale } from '../../constants/translations';
 import { UserTransaction, fetchUserTransactions, formatDuration, formatEnergy } from '../../lib/charging';
+import { formatDbDate, parseDbDateMs } from '../../lib/dates';
 
 export default function HistoryScreen() {
   const { colors } = useTheme();
@@ -71,26 +72,23 @@ export default function HistoryScreen() {
     setRefreshing(false);
   };
 
-  const formatDate = (dateStr: string | null | undefined) => {
-    if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return '—';
-    return d.toLocaleDateString(getLocale(language), {
+  // parseDbDate handles Postgres "YYYY-MM-DD HH:MM:SS+00" — bare `new Date()`
+  // is NaN on Hermes, which previously made these rows fall back to '—'.
+  const formatDate = (dateStr: string | null | undefined) =>
+    formatDbDate(dateStr, getLocale(language), {
       day: 'numeric',
       month: 'short',
       hour: '2-digit',
       minute: '2-digit',
     });
-  };
 
   const getDurationMinutes = (tx: UserTransaction): number => {
-    // Defensive: missing start → no duration calculable; return 0 so formatDuration
-    // doesn't render "NaNh".
-    if (!tx.startTimestamp) return 0;
-    const start = new Date(tx.startTimestamp).getTime();
-    if (isNaN(start)) return 0;
-    const end = tx.stopTimestamp ? new Date(tx.stopTimestamp).getTime() : Date.now();
-    if (isNaN(end)) return 0;
+    // NaN (not 0) on missing data: formatDuration renders NaN as '—', while a
+    // genuine 0 means "sub-minute session" and renders as '<1 min'.
+    const start = parseDbDateMs(tx.startTimestamp);
+    if (isNaN(start)) return NaN;
+    const end = tx.stopTimestamp ? parseDbDateMs(tx.stopTimestamp) : Date.now();
+    if (isNaN(end)) return NaN;
     return (end - start) / 60000;
   };
 

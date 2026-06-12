@@ -16,6 +16,7 @@ import {
   StationReview,
   StationPhoto,
 } from '../../lib/v2Features';
+import { formatDbDate } from '../../lib/dates';
 
 export default function StationReviewsScreen() {
   const { chargePointId } = useLocalSearchParams<{ chargePointId: string }>();
@@ -136,7 +137,7 @@ export default function StationReviewsScreen() {
               </View>
               {r.comment && <Text style={[styles.reviewText, { color: colors.text }]}>{r.comment}</Text>}
               <Text style={[styles.reviewDate, { color: colors.textMuted }]}>
-                {new Date(r.created_at).toLocaleDateString('cs')}
+                {formatDbDate(r.created_at, 'cs', { day: 'numeric', month: 'numeric', year: 'numeric' })}
               </Text>
             </View>
           ))}
