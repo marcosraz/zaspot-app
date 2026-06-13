@@ -14,6 +14,7 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
@@ -28,7 +29,7 @@ import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { ChargingStation } from '../../lib/stations';
 import { fetchStationsWithCache, fetchOcppStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
-import { fetchEmpStations } from '../../lib/v2Features';
+import { fetchEmpStations, empRemoteStart } from '../../lib/v2Features';
 import { openNavigationTo } from '../../lib/navigation';
 import FavoriteButton from '../../components/FavoriteButton';
 import { LiveStationPrice } from '../../components/LiveStationPrice';
@@ -84,6 +85,7 @@ export default function MapScreen() {
   // Live prices for sorting/filtering (ZAspot bulk prices + EUR/CZK rate)
   const [priceCtx, setPriceCtx] = useState<PriceContext | null>(null);
   const [showCheapest, setShowCheapest] = useState(false);
+  const [empStarting, setEmpStarting] = useState(false);
 
   // Default: Czech Republic center
   const [region, setRegion] = useState<Region>({
@@ -297,6 +299,44 @@ export default function MapScreen() {
     setSelectedStation(station);
     webViewRef.current?.injectJavaScript(
       `map.setView([${Number(station.latitude)}, ${Number(station.longitude)}], 14); true;`
+    );
+  };
+
+  // Station classification for the detail card's primary action.
+  const isEmpStation = (s: ChargingStation) => typeof s.id === 'string' && s.id.startsWith('emp-');
+  const isChargeableHere = (s: ChargingStation) => s.is_ocpp === true || isEmpStation(s);
+
+  // Start a roaming charge straight from the map card (foreign Hubject station).
+  // Mirrors the emp-stations screen flow; on success we hand off to that screen
+  // which has the live session banner + stop button.
+  const handleRoamingStart = (station: ChargingStation) => {
+    const evseId = String(station.id).replace(/^emp-/, '');
+    Alert.alert(
+      'Zahájit nabíjení',
+      `${station.name}\n\nČástka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.`,
+      [
+        { text: 'Zrušit', style: 'cancel' },
+        {
+          text: 'Nabít',
+          onPress: async () => {
+            setEmpStarting(true);
+            const res = await empRemoteStart(evseId);
+            setEmpStarting(false);
+            if (res.ok && res.data?.success) {
+              setSelectedStation(null);
+              router.push('/emp-stations');
+            } else if (res.status === 402) {
+              const min = res.data?.min_balance_czk ?? 200;
+              Alert.alert('Nedostatečný kredit', `Pro roaming je potřeba alespoň ${min} Kč.`);
+            } else if (res.status === 409) {
+              Alert.alert('Aktivní nabíjení', 'Už máte aktivní roamingové nabíjení.');
+              router.push('/emp-stations');
+            } else {
+              Alert.alert('Chyba', 'Operátor stanice požadavek odmítl. Zkuste to znovu nebo vyberte jinou stanici.');
+            }
+          },
+        },
+      ]
     );
   };
 
@@ -737,10 +777,23 @@ export default function MapScreen() {
             </View>
           )}
 
-          {/* Actions */}
+          {/* External station note — we can't charge here through ZAspot */}
+          {!isChargeableHere(selectedStation) && (
+            <Text style={[styles.externalNote, { color: colors.textMuted }]}>
+              Externí stanice — nabíjení přes ZAspot zde není dostupné.
+            </Text>
+          )}
+
+          {/* Actions — primary action depends on station type:
+              ZAspot OCPP → full detail (start/stop), Hubject → roaming charge,
+              foreign public station → navigate only (not chargeable via us). */}
           <View style={styles.cardActions}>
             <TouchableOpacity
-              style={[styles.actionBtnSecondary, { borderColor: Colors.brand.accentGreen }]}
+              style={[
+                styles.actionBtnSecondary,
+                { borderColor: Colors.brand.accentGreen },
+                !isChargeableHere(selectedStation) && { flex: 1 },
+              ]}
               onPress={() => openNavigation(selectedStation)}
             >
               <Ionicons name="navigate" size={20} color={Colors.brand.accentGreen} />
@@ -749,16 +802,35 @@ export default function MapScreen() {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.actionBtnPrimary}
-              onPress={() => {
-                setSelectedStation(null);
-                router.push(`/station/${selectedStation.id}`);
-              }}
-            >
-              <Ionicons name="flash" size={20} color="#FFFFFF" />
-              <Text style={styles.actionBtnPrimaryText}>{t.map.stationDetails}</Text>
-            </TouchableOpacity>
+            {selectedStation.is_ocpp && (
+              <TouchableOpacity
+                style={styles.actionBtnPrimary}
+                onPress={() => {
+                  setSelectedStation(null);
+                  router.push(`/station/${selectedStation.id}`);
+                }}
+              >
+                <Ionicons name="flash" size={20} color="#FFFFFF" />
+                <Text style={styles.actionBtnPrimaryText}>{t.map.stationDetails}</Text>
+              </TouchableOpacity>
+            )}
+
+            {isEmpStation(selectedStation) && (
+              <TouchableOpacity
+                style={styles.actionBtnPrimary}
+                onPress={() => handleRoamingStart(selectedStation)}
+                disabled={empStarting}
+              >
+                {empStarting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="flash" size={20} color="#FFFFFF" />
+                    <Text style={styles.actionBtnPrimaryText}>Nabít</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -1345,6 +1417,11 @@ const styles = StyleSheet.create({
   cardActions: {
     flexDirection: 'row',
     gap: 12,
+  },
+  externalNote: {
+    fontSize: 12,
+    marginBottom: 10,
+    fontStyle: 'italic',
   },
   actionBtnSecondary: {
     flex: 1,
