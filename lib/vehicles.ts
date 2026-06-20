@@ -71,15 +71,18 @@ export async function fetchPendingVehicles(): Promise<PendingVehicle[]> {
 
 /**
  * Register a vehicle for AutoCharge (requires auth)
- * Accepts MAC address from discovery or manual entry
+ * Accepts MAC address from discovery or manual entry.
+ * For manually entered MACs (not auto-detected at a station), pass manual=true
+ * so the backend skips its "must be in unknown_id_tags" check (route.ts:155).
  */
 export async function registerVehicle(
   idTag: string,
-  description: string
+  description: string,
+  manual = false
 ): Promise<{ success: boolean; error?: string }> {
   const res = await apiFetch<{ success: boolean; error?: string }>('/vehicles', {
     method: 'POST',
-    body: JSON.stringify({ macAddress: idTag, description }),
+    body: JSON.stringify({ macAddress: idTag, description, manual }),
     requireAuth: true,
   });
   return { success: res.ok, error: res.data?.error };

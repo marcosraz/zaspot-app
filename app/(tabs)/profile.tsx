@@ -195,7 +195,9 @@ export default function ProfileScreen() {
     const mac = manualMac.trim();
     const name = manualMacName.trim();
     if (!mac || !name) return;
-    const result = await registerVehicle(mac, name);
+    // manual=true: MAC was typed in, not auto-detected → backend must skip its
+    // "vehicle must already be in unknown_id_tags" check, otherwise it 400s.
+    const result = await registerVehicle(mac, name, true);
     if (result.success) {
       setShowManualMac(false);
       setManualMac('');
