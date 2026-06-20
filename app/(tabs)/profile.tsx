@@ -139,9 +139,11 @@ export default function ProfileScreen() {
   const [rfidTag, setRfidTag] = useState('');
   const [rfidName, setRfidName] = useState('');
 
-  const loadAutoCharge = async () => {
+  // silent=true skips the loading spinner — used by the background poll so the
+  // list refreshes without flicker while the section stays open.
+  const loadAutoCharge = async (silent = false) => {
     if (!isAuthenticated) return;
-    setAutoChargeLoading(true);
+    if (!silent) setAutoChargeLoading(true);
     const [registered, pending, rfid] = await Promise.all([
       fetchRegisteredVehicles(),
       fetchPendingVehicles(),
@@ -150,13 +152,22 @@ export default function ProfileScreen() {
     setRegisteredVehicles(registered);
     setPendingVehicles(pending);
     setRfidCards(rfid);
-    setAutoChargeLoading(false);
+    if (!silent) setAutoChargeLoading(false);
   };
 
   useEffect(() => {
     if (showAutoCharge && isAuthenticated) {
       loadAutoCharge();
     }
+  }, [showAutoCharge, isAuthenticated]);
+
+  // Live-poll while the AutoCharge section is open so a car the user is currently
+  // charging (just detected at a station) appears without re-opening the section.
+  // Matches the web charge page's 5s polling; silent so it doesn't flash a spinner.
+  useEffect(() => {
+    if (!showAutoCharge || !isAuthenticated) return;
+    const interval = setInterval(() => loadAutoCharge(true), 6000);
+    return () => clearInterval(interval);
   }, [showAutoCharge, isAuthenticated]);
 
   const handleRegisterVehicle = async (idTag: string) => {

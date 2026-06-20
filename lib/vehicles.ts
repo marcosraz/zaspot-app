@@ -54,7 +54,10 @@ export async function fetchRegisteredVehicles(): Promise<RegisteredVehicle[]> {
 export async function fetchPendingVehicles(): Promise<PendingVehicle[]> {
   // API shape: { pendingVehicles: [{ macAddress, lastSeen, attempts, chargePointId }] }
   // This is the AutoCharge MAC the user registers — unwrap + remap to UI fields.
-  const res = await apiFetch<{ pendingVehicles?: any[] }>('/vehicles/pending', {
+  // minutes=30 matches the web charge page: the station only sends Authorize at
+  // plug-in (not continuously), so the default 10-min window often drops a car
+  // the user is still actively charging. 30 min gives a realistic detection window.
+  const res = await apiFetch<{ pendingVehicles?: any[] }>('/vehicles/pending?minutes=30', {
     requireAuth: true,
   });
   if (res.ok && Array.isArray(res.data?.pendingVehicles)) {
