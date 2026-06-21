@@ -228,8 +228,11 @@ export async function fetchMyCards(): Promise<{ ok: boolean; status: number; dat
 }
 
 export async function registerCard() {
-  // Returns a payment URL where user enters card to register it without charge
-  return apiFetch<{ success: boolean; registrationUrl?: string }>('/payment/register-card', {
+  // Returns a payment URL where user enters card to register it without charge.
+  // Backend (and the web app) return this as `verification_url`; older app code
+  // read `registrationUrl` → always undefined → "Registraci karty se nepodařilo
+  // zahájit". Accept both names so the contract can't silently drift again.
+  return apiFetch<{ success: boolean; verification_url?: string; registrationUrl?: string }>('/payment/register-card', {
     method: 'POST',
     body: JSON.stringify({}),
     requireAuth: true,

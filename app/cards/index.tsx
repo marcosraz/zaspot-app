@@ -32,8 +32,10 @@ export default function CardsScreen() {
     setRegistering(true);
     const res = await registerCard();
     setRegistering(false);
-    if (res.ok && res.data.registrationUrl) {
-      await WebBrowser.openBrowserAsync(res.data.registrationUrl);
+    // Backend returns `verification_url`; keep `registrationUrl` as a fallback.
+    const url = res.data?.verification_url ?? res.data?.registrationUrl;
+    if (res.ok && url) {
+      await WebBrowser.openBrowserAsync(url);
       await load();
     } else {
       Alert.alert('Chyba', 'Registraci karty se nepodařilo zahájit');
