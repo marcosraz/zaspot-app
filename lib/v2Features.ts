@@ -213,10 +213,15 @@ export async function fetchMyCards(): Promise<{ ok: boolean; status: number; dat
   if (res.ok && res.data?.success) {
     if (Array.isArray(res.data.cards)) {
       cards = res.data.cards;
-    } else if (res.data.has_card && res.data.card_pattern) {
+    } else if (res.data.has_card && res.data.token_status !== 'DECLINED' && res.data.token_status !== 'REVOKED') {
+      // GP CARD_VERIFICATION returns a TOKEN but NOT a PANPATTERN, so the backend's
+      // card_pattern is null for every registered card. Previously we required a
+      // pattern → the saved card never showed ("Žádné uložené karty"). Show it from
+      // the verified token alone; masked digits fall back to a placeholder until the
+      // PAN is fetched separately (GP WS getTokenStatus, follow-up).
       cards = [{
         id: 'default',
-        masked_pan: res.data.card_pattern,
+        masked_pan: res.data.card_pattern || 'Uložená karta',
         expiry: '',
         card_brand: null,
         is_default: true,

@@ -78,7 +78,7 @@ export default function CardsScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.cardPan, { color: colors.text }]}>{c.masked_pan}</Text>
                   <Text style={[styles.cardMeta, { color: colors.textMuted }]}>
-                    {c.card_brand ?? '–'} · {c.expiry}
+                    {[c.card_brand, c.expiry].filter(Boolean).join(' · ') || 'Aktivní'}
                   </Text>
                 </View>
                 {c.is_default && (

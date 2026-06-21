@@ -99,6 +99,7 @@ export default function ProfileScreen() {
   const [customVehName, setCustomVehName] = useState('');
   const [customVehBattery, setCustomVehBattery] = useState('');
   const [customVehConsumption, setCustomVehConsumption] = useState('');
+  const [customVehMaxPower, setCustomVehMaxPower] = useState('');
 
   const saveCustomVehicle = () => {
     const name = customVehName.trim();
@@ -109,18 +110,23 @@ export default function ProfileScreen() {
     if (!(consumption > 0)) { Alert.alert('Chyba', 'Zadejte průměrnou spotřebu v kWh/100 km'); return; }
     // Existing route/range logic is range-based; derive range from battery + consumption.
     const rangeKm = Math.round((battery / consumption) * 100);
+    // Max charging power caps the route planner's charge speed. Optional field;
+    // default 150 kW (typical modern DC) instead of the old hardcoded 50 kW,
+    // which throttled fast cars like the user's "Plaid" to 50 kW.
+    const maxPower = parseFloat(customVehMaxPower.replace(',', '.'));
     setSelectedVehicle({
       id: `custom-${Date.now()}`,
       name,
       manufacturer: '',
       batteryCapacityKwh: battery,
       rangeKm,
-      maxChargingPowerKw: 50, // sane default; not part of the requested fields
+      maxChargingPowerKw: maxPower > 0 ? maxPower : 150,
       connectorType: 'CCS2',
     });
     setCustomVehName('');
     setCustomVehBattery('');
     setCustomVehConsumption('');
+    setCustomVehMaxPower('');
     setShowCustomVehicle(false);
     setShowVehicleSelector(false);
   };
@@ -565,6 +571,14 @@ export default function ProfileScreen() {
                       keyboardType="numeric"
                       value={customVehConsumption}
                       onChangeText={setCustomVehConsumption}
+                    />
+                    <TextInput
+                      style={[styles.customVehicleInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
+                      placeholder="Max. nabíjecí výkon kW (např. 150)"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      value={customVehMaxPower}
+                      onChangeText={setCustomVehMaxPower}
                     />
                     <TouchableOpacity
                       style={[styles.customVehicleSave, { backgroundColor: Colors.brand.accentGreen }]}
