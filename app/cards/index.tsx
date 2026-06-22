@@ -5,18 +5,16 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
+import { Stack, router, useFocusEffect } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
-import { fetchMyCards, registerCard, deleteCard, SavedCard } from '../../lib/v2Features';
+import { fetchMyCards, deleteCard, SavedCard } from '../../lib/v2Features';
 
 export default function CardsScreen() {
   const { colors } = useTheme();
   const [cards, setCards] = useState<SavedCard[]>([]);
   const [loading, setLoading] = useState(true);
-  const [registering, setRegistering] = useState(false);
 
   const load = async () => {
     const res = await fetchMyCards();
@@ -24,25 +22,26 @@ export default function CardsScreen() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  // Reload on every focus so a card saved during a top-up (the user navigates here
+  // after topping up) shows up without leaving and re-entering the screen.
+  useFocusEffect(
+    React.useCallback(() => {
+      load();
+    }, [])
+  );
 
-  const onAddCard = async () => {
-    setRegistering(true);
-    const res = await registerCard();
-    setRegistering(false);
-    // Backend returns `verification_url`; keep `registrationUrl` as a fallback.
-    const url = res.data?.verification_url ?? res.data?.registrationUrl;
-    if (res.ok && url) {
-      // openAuthSessionAsync (NOT openBrowserAsync) binds the browser session to the app
-      // so it resumes after a 3DS app-switch (Revolut) and the GP→callback→deep-link chain
-      // completes — that's what actually saves the card token. Resolves on zaspot:// return.
-      await WebBrowser.openAuthSessionAsync(url, 'zaspot://payment-return');
-      await load();
-    } else {
-      Alert.alert('Chyba', 'Registraci karty se nepodařilo zahájit');
-    }
+  const onAddCard = () => {
+    // GP's standalone CARD_VERIFICATION never returns a callback (verified live), so a
+    // card cannot be registered without a payment. Cards are saved automatically on the
+    // first credit top-up (USERPARAM1=T). Send the user there instead of the dead flow.
+    Alert.alert(
+      'Uložení karty',
+      'Karta se uloží automaticky při prvním dobití kreditu. Přejít na dobití kreditu?',
+      [
+        { text: 'Zrušit', style: 'cancel' },
+        { text: 'Dobít kredit', onPress: () => router.push('/top-up') },
+      ]
+    );
   };
 
   const onDelete = (card: SavedCard) => {
@@ -98,17 +97,10 @@ export default function CardsScreen() {
 
           <TouchableOpacity
             onPress={onAddCard}
-            disabled={registering}
-            style={[styles.addBtn, { backgroundColor: Colors.brand.accentGreen, opacity: registering ? 0.6 : 1 }]}
+            style={[styles.addBtn, { backgroundColor: Colors.brand.accentGreen }]}
           >
-            {registering ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <>
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.addBtnText}>Přidat kartu</Text>
-              </>
-            )}
+            <Ionicons name="add" size={20} color="#fff" />
+            <Text style={styles.addBtnText}>Přidat kartu</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
