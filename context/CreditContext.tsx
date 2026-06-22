@@ -4,8 +4,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { Platform, Linking, AppState } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Linking, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import { apiFetch } from '../lib/api';
 
@@ -99,25 +98,23 @@ export function CreditProvider({ children }: CreditProviderProps) {
     payMethod?: 'GPAY' | 'APAY'
   ): Promise<{ success: boolean; error?: string }> => {
     try {
-      // iOS: Apple Pay only renders in real Safari — SFSafariViewController (used
-      // by WebBrowser) hides the Apple Pay button. So on iOS we hand off to Safari
-      // via Linking.openURL and tag the payment with client:'app' so the GP
-      // callback bounces the user back into the app (see app/credit/success.tsx).
-      // Android keeps Custom Tabs (Google Pay works there) — unchanged behaviour.
-      const useSafari = Platform.OS === 'ios';
-
+      // Hand off to the REAL external browser on BOTH platforms via Linking.openURL —
+      // NOT an in-app browser / Custom Tab. When 3DS hops to another app (e.g. Revolut)
+      // and returns, the in-app browser tab is dismissed → the GP session is orphaned
+      // and the payment never completes (user lands back on "select amount", nothing
+      // charged). The real external browser survives the app-switch (exactly why it
+      // "works on the website"); the AppState foreground listener refreshes the balance
+      // when the user returns. iOS already did this (also required for Apple Pay).
       const res = await apiFetch<{ success: boolean; payment_url?: string; paymentUrl?: string; completed?: boolean; order_number?: string; error?: string }>(
         '/payment/create',
         {
           method: 'POST',
-          // Backend expects snake_case `amount_czk` (see app/api/payment/create/route.ts)
-          // client:'app' only on iOS — it drives the Safari return-marker + the
-          // CIT `completed` shortcut. Android keeps its Custom-Tabs flow unchanged.
-          // pay_method narrows GP's PAYMETHODS to one wallet (dedicated
-          // Google Pay / Apple Pay buttons on the top-up screen).
+          // Backend expects snake_case `amount_czk` (see app/api/payment/create/route.ts).
+          // client:'app' on both platforms → GP callback returns to the app success page.
+          // pay_method narrows GP's PAYMETHODS to one wallet (dedicated GPay/APay buttons).
           body: JSON.stringify({
             amount_czk: amountCzk,
-            client: useSafari ? 'app' : undefined,
+            client: 'app',
             pay_method: payMethod,
           }),
           requireAuth: true,
@@ -134,26 +131,10 @@ export function CreditProvider({ children }: CreditProviderProps) {
       // Backend returns `payment_url` (snake_case). Older fallback for `paymentUrl`.
       const paymentUrl = res.ok ? (res.data.payment_url ?? res.data.paymentUrl) : undefined;
       if (res.ok && paymentUrl) {
-        if (useSafari) {
-          // Hands off to Safari and resolves immediately — the deep-link return
-          // (app/credit/success.tsx) and the AppState foreground listener refresh
-          // the balance once the user comes back.
-          await Linking.openURL(paymentUrl);
-          return { success: true };
-        }
-
-        // Android: Custom Tabs overlay; promise resolves when the tab is dismissed.
-        const result = await WebBrowser.openBrowserAsync(paymentUrl, {
-          dismissButtonStyle: 'cancel',
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-        });
-
-        // After browser closes, refresh balance
-        if (result.type === 'cancel' || result.type === 'dismiss') {
-          // User may have completed payment, refresh to check
-          await fetchBalance();
-        }
-
+        // Real external browser on both platforms. Resolves immediately (the browser
+        // is a separate app); the AppState foreground listener refreshes the balance
+        // when the user comes back after paying.
+        await Linking.openURL(paymentUrl);
         return { success: true };
       }
 
