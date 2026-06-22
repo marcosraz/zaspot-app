@@ -35,7 +35,10 @@ export default function CardsScreen() {
     // Backend returns `verification_url`; keep `registrationUrl` as a fallback.
     const url = res.data?.verification_url ?? res.data?.registrationUrl;
     if (res.ok && url) {
-      await WebBrowser.openBrowserAsync(url);
+      // openAuthSessionAsync (NOT openBrowserAsync) binds the browser session to the app
+      // so it resumes after a 3DS app-switch (Revolut) and the GP→callback→deep-link chain
+      // completes — that's what actually saves the card token. Resolves on zaspot:// return.
+      await WebBrowser.openAuthSessionAsync(url, 'zaspot://payment-return');
       await load();
     } else {
       Alert.alert('Chyba', 'Registraci karty se nepodařilo zahájit');

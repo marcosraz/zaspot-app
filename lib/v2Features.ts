@@ -239,7 +239,9 @@ export async function registerCard() {
   // zahájit". Accept both names so the contract can't silently drift again.
   return apiFetch<{ success: boolean; verification_url?: string; registrationUrl?: string }>('/payment/register-card', {
     method: 'POST',
-    body: JSON.stringify({}),
+    // client:'app' makes the backend point the GP returnUrl at the zaspot:// deep link
+    // so openAuthSessionAsync can resume after a 3DS app-switch (e.g. Revolut).
+    body: JSON.stringify({ client: 'app' }),
     requireAuth: true,
   });
 }
