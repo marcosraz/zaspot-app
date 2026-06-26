@@ -54,10 +54,20 @@ export default function ScanScreen() {
   const [manualMode, setManualMode] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const handlingRef = useRef(false);
+  const askedRef = useRef(false);
 
-  // Auto-request camera permission on mount when allowed
+  // Auto-request camera permission once on mount when allowed.
+  // IMPORTANT: this effect depends on `permission`, which changes after every
+  // user decision. Without the askedRef guard it re-fires the system dialog the
+  // instant the user taps "Deny" once (canAskAgain is still true after a single
+  // denial) — two reflexive taps then burn Android's two allowed denials and
+  // lock the user out permanently (canAskAgain=false → dialog never shows again,
+  // only Settings can re-grant). Asking exactly once avoids that trap; if the
+  // user declines, they recover via the on-screen button or manual entry.
   useEffect(() => {
+    if (askedRef.current) return;
     if (permission && !permission.granted && permission.canAskAgain) {
+      askedRef.current = true;
       requestPermission();
     }
   }, [permission]);
@@ -126,7 +136,9 @@ export default function ScanScreen() {
               Bez přístupu k fotoaparátu
             </Text>
             <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
-              Pro skenování QR kódů aktivujte přístup v nastavení, nebo zadejte ID stanice ručně.
+              {permission.canAskAgain
+                ? 'Pro skenování QR kódů povolte přístup k fotoaparátu, nebo zadejte ID stanice ručně.'
+                : 'Přístup ke kameře je zakázán. Otevřete Nastavení → Oprávnění → Fotoaparát → Povolit, nebo zadejte ID stanice ručně.'}
             </Text>
             <TouchableOpacity
               onPress={() => {

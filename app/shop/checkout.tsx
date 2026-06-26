@@ -2,11 +2,10 @@
  * Shop Checkout — Cart review & payment
  */
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useTheme } from '../../context/ThemeContext';
 import { useShop } from '../../context/ShopContext';
 import { useCredit } from '../../context/CreditContext';
@@ -59,7 +58,11 @@ export default function CheckoutScreen() {
     }
 
     if (res.data.paymentUrl) {
-      await WebBrowser.openBrowserAsync(res.data.paymentUrl);
+      // Real external browser — NOT an in-app Custom Tab. A 3DS challenge that hops
+      // to another app (e.g. Revolut) destroys an in-app tab and orphans the GP
+      // session (payment never finalizes). The external browser survives the
+      // app-switch, exactly like the credit top-up flow (see CreditContext).
+      await Linking.openURL(res.data.paymentUrl);
     }
     clearCart();
     Alert.alert('Hotovo', 'Objednávka byla vytvořena', [

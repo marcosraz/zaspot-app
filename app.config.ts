@@ -45,6 +45,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     permissions: [
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
+      // expo-camera's plugin already adds CAMERA, but declare it explicitly so a
+      // stale/cached prebuild (local build-copy-rebuild hack) can never drop it.
+      'android.permission.CAMERA',
     ],
     config: {
       googleMaps: {
