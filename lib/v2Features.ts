@@ -512,6 +512,8 @@ export interface EmpStation {
   connectors: Array<{ type: string; power_kw: number }>;
   status: 'available' | 'occupied' | 'unknown';
   price_per_kwh: number | null;
+  /** With group=location: number of charge points at this physical site (else 1). */
+  evse_count: number;
 }
 
 // The /emp/stations endpoint returns DB-shaped rows (station_name, geo_lat,
@@ -539,6 +541,7 @@ function adaptEmpStation(raw: any): EmpStation {
     connectors,
     status,
     price_per_kwh: typeof raw?.price_per_kwh === 'number' ? raw.price_per_kwh : null,
+    evse_count: typeof raw?.evse_count === 'number' && raw.evse_count > 0 ? raw.evse_count : 1,
   };
 }
 
@@ -547,15 +550,21 @@ export async function fetchEmpStations(params?: {
   lng?: number;
   radius_km?: number;
   /** Map viewport "west,south,east,north" — preferred over lat/radius for the
-   *  map, mirrors the web charging-map. Server caps limit at 1000. */
+   *  map, mirrors the web charging-map. Server caps limit at 1000 (2500 grouped). */
   bounds?: string;
   limit?: number;
+  /** Collapse to one row per physical location (server group=location). The raw
+   *  mode returns one row per EVSE — a 4-connector site eats 4 of the limit's
+   *  slots and dense viewports truncate ALPHABETICALLY (server orderBy name),
+   *  which is why zoomed-out views silently showed a fraction of the stations. */
+  groupByLocation?: boolean;
 }): Promise<{ ok: boolean; status: number; data: { success: boolean; stations: EmpStation[] } }> {
   const qs = new URLSearchParams();
   // The route reads lat/lon/radius (NOT lng/radius_km). With the wrong names the
   // geo filter never activated → full-table scan of ~53k rows → the request hung
   // and the screen spun forever. Use the correct names + a hard limit so it hits
   // the (geo_lat, geo_lon) index and returns only the nearby bounding box.
+  if (params?.groupByLocation) qs.set('group', 'location');
   if (params?.bounds) qs.set('bounds', params.bounds);
   if (params?.lat != null) qs.set('lat', String(params.lat));
   if (params?.lng != null) qs.set('lon', String(params.lng));

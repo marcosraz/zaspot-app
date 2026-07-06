@@ -136,10 +136,12 @@ export default function MapScreen() {
   };
 
   // ── Hubject roaming stations: loaded PER MAP VIEWPORT (like the web map).
-  // The full Hubject set is ~53k stations; a single radius fetch capped at a
-  // few hundred rows left the map looking empty. Instead Leaflet reports its
-  // bounds after every pan/zoom and we fetch up to 1000 stations for exactly
-  // that box, merging into a session cache so panning back is instant.
+  // The full Hubject set is ~53k EVSE rows = ~19k physical locations. We fetch
+  // GROUPED (one row per location, group=location) with limit 2500: all of CZ
+  // is ~2,253 locations, so the CZ seed below covers the whole country, and a
+  // Prague/Vienna viewport fits without the silent alphabetical truncation the
+  // raw per-EVSE mode suffered (4-connector sites ate 4 of 1000 slots, cut by
+  // name). Grouped truncation, if any, drops lowest-power AC posts first.
   const EMP_MIN_ZOOM = 8; // below this a viewport spans whole countries — skip
   const empCacheRef = useRef<Map<string, ChargingStation>>(new Map());
   const empDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -163,7 +165,9 @@ export default function MapScreen() {
     operator: s.operator,
     operator_phone: null,
     connector_types: s.connectors.map((c) => c.type),
-    num_connectors: s.connectors.length,
+    // Grouped rows represent a whole site: evse_count = charge points there
+    // (the representative row only carries the top EVSE's plug list).
+    num_connectors: Math.max(s.evse_count, s.connectors.length),
     access_hours: '24/7',
     parking_fee: false,
     description: null,
@@ -171,7 +175,7 @@ export default function MapScreen() {
 
   const loadEmpForBounds = useCallback((b: { west: number; south: number; east: number; north: number }) => {
     setEmpLoading(true);
-    fetchEmpStations({ bounds: `${b.west},${b.south},${b.east},${b.north}`, limit: 1000 })
+    fetchEmpStations({ bounds: `${b.west},${b.south},${b.east},${b.north}`, limit: 2500, groupByLocation: true })
       .then((res) => {
         if (res.ok && res.data?.success) {
           const cache = empCacheRef.current;
@@ -198,7 +202,9 @@ export default function MapScreen() {
     if (networkFilter !== 'all') return;
     webViewRef.current?.injectJavaScript('window.requestBounds && window.requestBounds(); true;');
     if (empCacheRef.current.size === 0) {
-      loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 }); // CZ-wide seed
+      // CZ-wide seed: grouped + limit 2500 ≥ all ~2,253 CZ locations → the
+      // whole country is on the map even before the first zoom-in.
+      loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 });
     }
   }, [networkFilter, loadEmpForBounds]);
 
