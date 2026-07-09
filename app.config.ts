@@ -72,6 +72,20 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-web-browser',
     '@react-native-google-signin/google-signin',
     [
+      // AppCheckCore (via GoogleSignIn SDK) is a Swift pod that imports
+      // GoogleUtilities + RecaptchaInterop — those need modular headers when
+      // built as static libraries, else `pod install` fails on EAS iOS builds.
+      'expo-build-properties',
+      {
+        ios: {
+          extraPods: [
+            { name: 'GoogleUtilities', modular_headers: true },
+            { name: 'RecaptchaInterop', modular_headers: true },
+          ],
+        },
+      },
+    ],
+    [
       'expo-camera',
       {
         cameraPermission: 'ZAspot potřebuje přístup k fotoaparátu pro skenování QR kódů u nabíjecích stanic.',
