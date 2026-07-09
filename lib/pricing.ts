@@ -106,3 +106,93 @@ export async function fetchEffectivePrices(): Promise<EffectivePrices | null> {
 export function formatPrice(price: number): string {
   return price.toFixed(2);
 }
+
+// ─── Station-specific tariff prices ──────────────────────────────
+//
+// Stations can have their own tariff (fixed price or custom operator markup)
+// that overrides the global spot formula above. /api/terminal-price is the
+// same source the web charge page uses; the formulas below mirror its
+// getConnectorPriceInclVat() and the OCPP-server billing path exactly:
+//   fixed: (fixedPrice + platformFee) × VAT
+//   spot:  (spot + distribution(AC/DC) + platformFee + operatorMarkup) × VAT
+//   both clamped to max(0.01, minPrice + platformFee) before VAT.
+
+export interface StationTariffPrices {
+  pricingMode: 'spot' | 'fixed';
+  /** Customer price incl. VAT for fixed tariffs (AC/DC identical) */
+  fixedPriceInclVat: number | null;
+  /** Customer prices incl. VAT for spot tariffs */
+  acPriceInclVat: number;
+  dcPriceInclVat: number;
+  spotPrice: number;
+  tariffName: string | null;
+  timestamp: string;
+}
+
+interface TerminalPriceResponse {
+  pricingMode?: string;
+  spotPrice?: number;
+  platformFee?: number;
+  distributionFeeAc?: number;
+  distributionFeeDc?: number;
+  operatorMarkup?: number;
+  fixedPrice?: number | null;
+  minPrice?: number;
+  stationFound?: boolean;
+  tariffName?: string | null;
+  timestamp?: string;
+}
+
+const stationPriceCache = new Map<string, { data: StationTariffPrices; at: number }>();
+const STATION_PRICE_TTL = 60 * 1000;
+
+export async function fetchStationTariffPrices(
+  chargePointId: string
+): Promise<StationTariffPrices | null> {
+  const hit = stationPriceCache.get(chargePointId);
+  if (hit && Date.now() - hit.at < STATION_PRICE_TTL) return hit.data;
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/terminal-price?chargePointId=${encodeURIComponent(chargePointId)}`
+    );
+    if (!res.ok) return hit?.data ?? null;
+
+    const data: TerminalPriceResponse = await res.json();
+    if (data.stationFound === false) return null;
+
+    const VAT = 1.21;
+    const spot = Number.isFinite(data.spotPrice) ? (data.spotPrice as number) : 0;
+    // NOT `|| 0.5` — a legitimate 0 platform fee must be honored (free networks)
+    const platformFee = Number.isFinite(data.platformFee) ? (data.platformFee as number) : 0.5;
+    const markup = Number.isFinite(data.operatorMarkup) ? (data.operatorMarkup as number) : 0;
+    const distAc = Number.isFinite(data.distributionFeeAc) ? (data.distributionFeeAc as number) : 2.27;
+    const distDc = Number.isFinite(data.distributionFeeDc) ? (data.distributionFeeDc as number) : 0.9;
+    const minPrice = Number.isFinite(data.minPrice) ? (data.minPrice as number) : 0;
+
+    const floor = Math.max(0.01, minPrice > 0 ? minPrice + platformFee : 0);
+    const clamp = (raw: number) => (raw < floor ? floor : raw);
+    const round2 = (v: number) => Math.round(v * 100) / 100;
+
+    const isFixed = data.pricingMode === 'fixed' && data.fixedPrice != null;
+    const fixedInclVat = isFixed
+      ? round2(clamp((data.fixedPrice as number) + platformFee) * VAT)
+      : null;
+
+    const prices: StationTariffPrices = {
+      pricingMode: isFixed ? 'fixed' : 'spot',
+      fixedPriceInclVat: fixedInclVat,
+      acPriceInclVat: fixedInclVat ?? round2(clamp(spot + distAc + platformFee + markup) * VAT),
+      dcPriceInclVat: fixedInclVat ?? round2(clamp(spot + distDc + platformFee + markup) * VAT),
+      spotPrice: spot,
+      tariffName: data.tariffName ?? null,
+      timestamp: data.timestamp ?? new Date().toISOString(),
+    };
+
+    stationPriceCache.set(chargePointId, { data: prices, at: Date.now() });
+    return prices;
+  } catch (error) {
+    console.error('Error fetching station tariff prices:', error);
+    return hit?.data ?? null;
+  }
+}

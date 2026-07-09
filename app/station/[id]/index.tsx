@@ -40,7 +40,12 @@ import {
   formatDuration,
   formatEnergy,
 } from '../../../lib/charging';
-import { fetchEffectivePrices, EffectivePrices } from '../../../lib/pricing';
+import {
+  fetchEffectivePrices,
+  EffectivePrices,
+  fetchStationTariffPrices,
+  StationTariffPrices,
+} from '../../../lib/pricing';
 import { createReservation } from '../../../lib/reservations';
 import { openNavigationTo } from '../../../lib/navigation';
 
@@ -60,6 +65,9 @@ export default function StationDetailScreen() {
   const [station, setStation] = useState<ChargePointDetail | null>(null);
   const [sessions, setSessions] = useState<ChargingSession[]>([]);
   const [prices, setPrices] = useState<EffectivePrices | null>(null);
+  // Station-specific tariff (fixed price / custom markup) — overrides the
+  // global spot prices; null means "no tariff info, fall back to global".
+  const [stationPrices, setStationPrices] = useState<StationTariffPrices | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // 'start-N' or 'stop-N'
@@ -78,9 +86,14 @@ export default function StationDetailScreen() {
 
     if (data) {
       setStation(data);
-      // Fetch active sessions (use UUID, not OCPP identity)
-      const activeSessions = await fetchActiveSessions(data.id);
+      // Fetch active sessions (use UUID, not OCPP identity) + the station's
+      // own tariff price (may be fixed / custom markup, differs from global)
+      const [activeSessions, tariffPrices] = await Promise.all([
+        fetchActiveSessions(data.id),
+        fetchStationTariffPrices(data.chargePointId),
+      ]);
       setSessions(activeSessions);
+      if (tariffPrices) setStationPrices(tariffPrices);
     }
     if (effectivePrices) setPrices(effectivePrices);
 
@@ -341,49 +354,70 @@ export default function StationDetailScreen() {
           )}
         </View>
 
-        {/* Current Prices */}
-        {prices && (
+        {/* Current Prices — station tariff wins over the global spot formula */}
+        {(stationPrices || prices) && (
           <View style={[styles.priceCard, { backgroundColor: colors.surface }]}>
             <View style={styles.priceCardHeader}>
               <Ionicons name="flash" size={18} color={Colors.brand.accentGreen} />
               <Text style={[styles.priceCardTitle, { color: colors.text }]}>
                 {l.currentPrices}
               </Text>
-              <Text style={[styles.priceTimeSlot, { color: colors.textMuted }]}>
-                {prices.timeSlot}
-              </Text>
+              {stationPrices?.pricingMode !== 'fixed' && prices && (
+                <Text style={[styles.priceTimeSlot, { color: colors.textMuted }]}>
+                  {prices.timeSlot}
+                </Text>
+              )}
             </View>
 
-            <View style={styles.priceRow}>
-              <View style={[styles.priceBox, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
-                <Text style={[styles.priceBoxLabel, { color: colors.textSecondary }]}>
-                  {l.acPrice}
-                </Text>
-                <Text style={[styles.priceBoxValue, { color: Colors.brand.accentGreen }]}>
-                  {format(prices.acPrice, { symbol: false, decimals: 2 })}
-                </Text>
-                <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
-                  {code}/kWh
-                </Text>
+            {stationPrices?.pricingMode === 'fixed' && stationPrices.fixedPriceInclVat != null ? (
+              /* Fixed tariff: one price for every connector — no AC/DC split */
+              <View style={styles.priceRow}>
+                <View style={[styles.priceBox, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
+                  <Text style={[styles.priceBoxLabel, { color: colors.textSecondary }]}>
+                    {l.fixedPrice}
+                  </Text>
+                  <Text style={[styles.priceBoxValue, { color: Colors.brand.accentGreen }]}>
+                    {format(stationPrices.fixedPriceInclVat, { symbol: false, decimals: 2 })}
+                  </Text>
+                  <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
+                    {code}/kWh
+                  </Text>
+                </View>
               </View>
-              <View style={[styles.priceBox, { backgroundColor: '#EF4444' + '12' }]}>
-                <Text style={[styles.priceBoxLabel, { color: colors.textSecondary }]}>
-                  {l.dcPrice}
-                </Text>
-                <Text style={[styles.priceBoxValue, { color: '#EF4444' }]}>
-                  {format(prices.dcPrice, { symbol: false, decimals: 2 })}
-                </Text>
-                <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
-                  {code}/kWh
-                </Text>
+            ) : (
+              <View style={styles.priceRow}>
+                <View style={[styles.priceBox, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
+                  <Text style={[styles.priceBoxLabel, { color: colors.textSecondary }]}>
+                    {l.acPrice}
+                  </Text>
+                  <Text style={[styles.priceBoxValue, { color: Colors.brand.accentGreen }]}>
+                    {format(stationPrices?.acPriceInclVat ?? prices!.acPrice, { symbol: false, decimals: 2 })}
+                  </Text>
+                  <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
+                    {code}/kWh
+                  </Text>
+                </View>
+                <View style={[styles.priceBox, { backgroundColor: '#EF4444' + '12' }]}>
+                  <Text style={[styles.priceBoxLabel, { color: colors.textSecondary }]}>
+                    {l.dcPrice}
+                  </Text>
+                  <Text style={[styles.priceBoxValue, { color: '#EF4444' }]}>
+                    {format(stationPrices?.dcPriceInclVat ?? prices!.dcPrice, { symbol: false, decimals: 2 })}
+                  </Text>
+                  <Text style={[styles.priceBoxUnit, { color: colors.textMuted }]}>
+                    {code}/kWh
+                  </Text>
+                </View>
               </View>
-            </View>
+            )}
 
-            <View style={[styles.spotPriceRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.spotPriceLabel, { color: colors.textMuted }]}>
-                {l.spotPrice}: {format(prices.spotPrice, { perKwh: true })}
-              </Text>
-            </View>
+            {stationPrices?.pricingMode !== 'fixed' && prices && (
+              <View style={[styles.spotPriceRow, { borderTopColor: colors.border }]}>
+                <Text style={[styles.spotPriceLabel, { color: colors.textMuted }]}>
+                  {l.spotPrice}: {format(prices.spotPrice, { perKwh: true })}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 

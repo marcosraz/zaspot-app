@@ -295,6 +295,7 @@ export interface Translations {
     currentPrices: string;
     acPrice: string;
     dcPrice: string;
+    fixedPrice: string;
     spotPrice: string;
     perKwh: string;
     timeSlot: string;
@@ -629,6 +630,7 @@ export const translations: Record<Language, Translations> = {
       currentPrices: 'Aktuální ceny',
       acPrice: 'AC nabíjení',
       dcPrice: 'DC nabíjení',
+      fixedPrice: 'Pevná cena',
       spotPrice: 'Spotová cena',
       perKwh: 'CZK/kWh',
       timeSlot: 'Časový slot',
@@ -956,6 +958,7 @@ export const translations: Record<Language, Translations> = {
       currentPrices: 'Current Prices',
       acPrice: 'AC Charging',
       dcPrice: 'DC Charging',
+      fixedPrice: 'Fixed Price',
       spotPrice: 'Spot Price',
       perKwh: 'CZK/kWh',
       timeSlot: 'Time slot',
@@ -1283,6 +1286,7 @@ export const translations: Record<Language, Translations> = {
       currentPrices: 'Aktuelle Preise',
       acPrice: 'AC-Laden',
       dcPrice: 'DC-Laden',
+      fixedPrice: 'Festpreis',
       spotPrice: 'Spotpreis',
       perKwh: 'CZK/kWh',
       timeSlot: 'Zeitfenster',
@@ -1610,6 +1614,7 @@ export const translations: Record<Language, Translations> = {
       currentPrices: 'Aktualne ceny',
       acPrice: 'Ładowanie AC',
       dcPrice: 'Ładowanie DC',
+      fixedPrice: 'Cena stała',
       spotPrice: 'Cena spot',
       perKwh: 'CZK/kWh',
       timeSlot: 'Przedział czasu',

@@ -3,7 +3,8 @@
  * station type on the map:
  *
  *  - ZAspot OCPP stations: live effective price from /api/ocpp/station-prices
- *    (spot + distribution + fees per station tariff, bulk endpoint)
+ *    (spot + distribution + fees per station tariff, incl. 21% VAT — the
+ *    customer-facing price, same as the web charge page; bulk endpoint)
  *  - Hubject roaming stations: price_per_kwh in EUR → × EUR/CZK rate
  *    (often null — those sort to the end and are excluded by price filters)
  *  - Public DB stations: their static price_per_kwh (already CZK)
