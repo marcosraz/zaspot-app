@@ -192,6 +192,22 @@ export interface Translations {
     removeVehicleConfirm: string;
     yes: string;
     no: string;
+    // Section headers & menu labels
+    walletSection: string;
+    discoverSection: string;
+    achievements: string;
+    topUpCredit: string;
+    myCards: string;
+    shop: string;
+    communityEnergy: string;
+    eRoaming: string;
+    currency: string;
+    // Custom vehicle placeholders & validation
+    maxPowerPlaceholder: string;
+    macPlaceholder: string;
+    enterVehicleName: string;
+    enterBatteryCapacity: string;
+    enterAvgConsumption: string;
   };
 
   // Reservations
@@ -350,6 +366,67 @@ export interface Translations {
     chargingStartedTitle: string;
     chargingStartedAt: string;
     chargingCompleteTitle: string;
+  };
+
+  // Achievements screen
+  achievements: {
+    title: string;
+    earnedCount: string;
+    earned: string;
+    inProgress: string;
+  };
+
+  // Community energy screen
+  community: {
+    title: string;
+    members: string;
+    myShare: string;
+    consumed: string;
+    saved: string;
+    thisMonth: string;
+    billing: string;
+    noBilling: string;
+    infoText: string;
+    availableCommunities: string;
+    noCommunities: string;
+    loginTitle: string;
+    loginMessage: string;
+    applySentTitle: string;
+    applySentMessage: string;
+    applyError: string;
+    roleQuestion: string;
+    producer: string;
+    consumer: string;
+  };
+
+  // Price alerts screen
+  priceAlerts: {
+    title: string;
+    newAlert: string;
+    spotPriceLabel: string;
+    whenBelow: string;
+    whenAbove: string;
+    createAlert: string;
+    invalidValue: string;
+    deleteTitle: string;
+    delete: string;
+    whenPriceBelow: string;
+    whenPriceAbove: string;
+    via: string;
+    noAlerts: string;
+  };
+
+  // RFID tags screen
+  rfidTags: {
+    title: string;
+    addTag: string;
+    uidPlaceholder: string;
+    descPlaceholder: string;
+    add: string;
+    addError: string;
+    deleteTitle: string;
+    delete: string;
+    noTags: string;
   };
 
   // Wallet transaction history
@@ -549,6 +626,22 @@ export const translations: Record<Language, Translations> = {
       removeVehicleConfirm: 'Opravdu chcete odebrat toto vozidlo?',
       yes: 'Ano',
       no: 'Ne',
+      // Section headers & menu labels
+      walletSection: 'Peněženka & platby',
+      discoverSection: 'Objevit',
+      achievements: 'Úspěchy',
+      topUpCredit: 'Dobít kredit',
+      myCards: 'Moje karty',
+      shop: 'Obchod',
+      communityEnergy: 'Komunitní energetika',
+      eRoaming: 'eRoaming (Hubject)',
+      currency: 'Měna',
+      // Custom vehicle placeholders & validation
+      maxPowerPlaceholder: 'Max. nabíjecí výkon kW (např. 150)',
+      macPlaceholder: 'MAC (např. 98:ED:5C:89:BE:0E)',
+      enterVehicleName: 'Zadejte název vozidla',
+      enterBatteryCapacity: 'Zadejte kapacitu baterie v kWh',
+      enterAvgConsumption: 'Zadejte průměrnou spotřebu v kWh/100 km',
     },
     reservations: {
       title: 'Rezervace',
@@ -695,6 +788,59 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Nabíjení zahájeno',
       chargingStartedAt: 'Nabíjení na {station} bylo úspěšně zahájeno.',
       chargingCompleteTitle: 'Nabíjení dokončeno',
+    },
+    achievements: {
+      title: 'Úspěchy',
+      earnedCount: 'Získané úspěchy',
+      earned: 'Získané',
+      inProgress: 'V průběhu',
+    },
+    community: {
+      title: 'Komunitní energetika',
+      members: 'členů',
+      myShare: 'Můj podíl',
+      consumed: 'Spotřebováno',
+      saved: 'Ušetřeno',
+      thisMonth: 'Tento měsíc',
+      billing: 'Vyúčtování',
+      noBilling: 'Zatím žádné vyúčtování',
+      infoText: 'Komunitní energetika umožňuje sdílet vyrobenou energii mezi členy komunity a šetřit za elektřinu.',
+      availableCommunities: 'Dostupné komunity',
+      noCommunities: 'Žádné aktivní komunity',
+      loginTitle: 'Přihlášení',
+      loginMessage: 'Pro vstup do komunity se nejprve přihlaste.',
+      applySentTitle: 'Žádost odeslána',
+      applySentMessage: 'Po schválení uvidíte své statistiky zde.',
+      applyError: 'Žádost se nepodařilo odeslat',
+      roleQuestion: 'Jste výrobce energie, nebo spotřebitel?',
+      producer: 'Výrobna',
+      consumer: 'Spotřeba',
+    },
+    priceAlerts: {
+      title: 'Cenové alerty',
+      newAlert: 'Nový alert',
+      spotPriceLabel: 'Spot cena (Kč/kWh)',
+      whenBelow: 'Když pod',
+      whenAbove: 'Když nad',
+      createAlert: 'Vytvořit alert',
+      invalidValue: 'Neplatná hodnota',
+      deleteTitle: 'Smazat alert?',
+      delete: 'Smazat',
+      whenPriceBelow: 'Když cena pod',
+      whenPriceAbove: 'Když cena nad',
+      via: 'via',
+      noAlerts: 'Žádné aktivní alerty',
+    },
+    rfidTags: {
+      title: 'RFID karty',
+      addTag: 'Přidat RFID tag',
+      uidPlaceholder: 'UID karty (např. ABCD1234)',
+      descPlaceholder: 'Popis (volitelné)',
+      add: 'Přidat',
+      addError: 'Tag se nepodařilo přidat',
+      deleteTitle: 'Smazat RFID tag?',
+      delete: 'Smazat',
+      noTags: 'Žádné RFID karty',
     },
     walletHistory: {
       title: 'Historie peněženky',
@@ -889,6 +1035,22 @@ export const translations: Record<Language, Translations> = {
       removeVehicleConfirm: 'Do you want to remove this vehicle?',
       yes: 'Yes',
       no: 'No',
+      // Section headers & menu labels
+      walletSection: 'Wallet & Payments',
+      discoverSection: 'Discover',
+      achievements: 'Achievements',
+      topUpCredit: 'Top up credit',
+      myCards: 'My cards',
+      shop: 'Shop',
+      communityEnergy: 'Community Energy',
+      eRoaming: 'eRoaming (Hubject)',
+      currency: 'Currency',
+      // Custom vehicle placeholders & validation
+      maxPowerPlaceholder: 'Max. charging power kW (e.g. 150)',
+      macPlaceholder: 'MAC (e.g. 98:ED:5C:89:BE:0E)',
+      enterVehicleName: 'Enter a vehicle name',
+      enterBatteryCapacity: 'Enter battery capacity in kWh',
+      enterAvgConsumption: 'Enter average consumption in kWh/100 km',
     },
     reservations: {
       title: 'Reservations',
@@ -1035,6 +1197,59 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Charging started',
       chargingStartedAt: 'Charging at {station} has been started successfully.',
       chargingCompleteTitle: 'Charging complete',
+    },
+    achievements: {
+      title: 'Achievements',
+      earnedCount: 'Achievements earned',
+      earned: 'Earned',
+      inProgress: 'In progress',
+    },
+    community: {
+      title: 'Community Energy',
+      members: 'members',
+      myShare: 'My share',
+      consumed: 'Consumed',
+      saved: 'Saved',
+      thisMonth: 'This month',
+      billing: 'Billing',
+      noBilling: 'No billing yet',
+      infoText: 'Community energy lets you share generated electricity between members and save on your bills.',
+      availableCommunities: 'Available communities',
+      noCommunities: 'No active communities',
+      loginTitle: 'Sign in',
+      loginMessage: 'Please sign in first to join a community.',
+      applySentTitle: 'Application sent',
+      applySentMessage: 'Once approved, you\'ll see your stats here.',
+      applyError: 'Could not send the application',
+      roleQuestion: 'Are you an energy producer or a consumer?',
+      producer: 'Producer',
+      consumer: 'Consumer',
+    },
+    priceAlerts: {
+      title: 'Price Alerts',
+      newAlert: 'New alert',
+      spotPriceLabel: 'Spot price (CZK/kWh)',
+      whenBelow: 'When below',
+      whenAbove: 'When above',
+      createAlert: 'Create alert',
+      invalidValue: 'Invalid value',
+      deleteTitle: 'Delete alert?',
+      delete: 'Delete',
+      whenPriceBelow: 'When price below',
+      whenPriceAbove: 'When price above',
+      via: 'via',
+      noAlerts: 'No active alerts',
+    },
+    rfidTags: {
+      title: 'RFID Cards',
+      addTag: 'Add RFID tag',
+      uidPlaceholder: 'Card UID (e.g. ABCD1234)',
+      descPlaceholder: 'Description (optional)',
+      add: 'Add',
+      addError: 'Could not add the tag',
+      deleteTitle: 'Delete RFID tag?',
+      delete: 'Delete',
+      noTags: 'No RFID cards',
     },
     walletHistory: {
       title: 'Wallet History',
@@ -1229,6 +1444,22 @@ export const translations: Record<Language, Translations> = {
       removeVehicleConfirm: 'Möchten Sie dieses Fahrzeug wirklich entfernen?',
       yes: 'Ja',
       no: 'Nein',
+      // Section headers & menu labels
+      walletSection: 'Wallet & Zahlungen',
+      discoverSection: 'Entdecken',
+      achievements: 'Erfolge',
+      topUpCredit: 'Guthaben aufladen',
+      myCards: 'Meine Karten',
+      shop: 'Shop',
+      communityEnergy: 'Gemeinschaftsenergie',
+      eRoaming: 'eRoaming (Hubject)',
+      currency: 'Währung',
+      // Custom vehicle placeholders & validation
+      maxPowerPlaceholder: 'Max. Ladeleistung kW (z.B. 150)',
+      macPlaceholder: 'MAC (z.B. 98:ED:5C:89:BE:0E)',
+      enterVehicleName: 'Fahrzeugnamen eingeben',
+      enterBatteryCapacity: 'Batteriekapazität in kWh eingeben',
+      enterAvgConsumption: 'Durchschnittsverbrauch in kWh/100 km eingeben',
     },
     reservations: {
       title: 'Reservierungen',
@@ -1375,6 +1606,59 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Laden gestartet',
       chargingStartedAt: 'Laden an {station} wurde erfolgreich gestartet.',
       chargingCompleteTitle: 'Laden abgeschlossen',
+    },
+    achievements: {
+      title: 'Erfolge',
+      earnedCount: 'Errungene Erfolge',
+      earned: 'Errungen',
+      inProgress: 'In Arbeit',
+    },
+    community: {
+      title: 'Gemeinschaftsenergie',
+      members: 'Mitglieder',
+      myShare: 'Mein Anteil',
+      consumed: 'Verbraucht',
+      saved: 'Gespart',
+      thisMonth: 'Diesen Monat',
+      billing: 'Abrechnung',
+      noBilling: 'Noch keine Abrechnung',
+      infoText: 'Gemeinschaftsenergie ermöglicht es, erzeugten Strom zwischen Mitgliedern zu teilen und bei der Stromrechnung zu sparen.',
+      availableCommunities: 'Verfügbare Gemeinschaften',
+      noCommunities: 'Keine aktiven Gemeinschaften',
+      loginTitle: 'Anmeldung',
+      loginMessage: 'Bitte melden Sie sich zuerst an, um einer Gemeinschaft beizutreten.',
+      applySentTitle: 'Antrag gesendet',
+      applySentMessage: 'Nach der Freigabe sehen Sie hier Ihre Statistiken.',
+      applyError: 'Antrag konnte nicht gesendet werden',
+      roleQuestion: 'Sind Sie Energieerzeuger oder Verbraucher?',
+      producer: 'Erzeuger',
+      consumer: 'Verbrauch',
+    },
+    priceAlerts: {
+      title: 'Preisalarme',
+      newAlert: 'Neuer Alarm',
+      spotPriceLabel: 'Spotpreis (CZK/kWh)',
+      whenBelow: 'Wenn unter',
+      whenAbove: 'Wenn über',
+      createAlert: 'Alarm erstellen',
+      invalidValue: 'Ungültiger Wert',
+      deleteTitle: 'Alarm löschen?',
+      delete: 'Löschen',
+      whenPriceBelow: 'Wenn Preis unter',
+      whenPriceAbove: 'Wenn Preis über',
+      via: 'via',
+      noAlerts: 'Keine aktiven Alarme',
+    },
+    rfidTags: {
+      title: 'RFID-Karten',
+      addTag: 'RFID-Tag hinzufügen',
+      uidPlaceholder: 'Karten-UID (z.B. ABCD1234)',
+      descPlaceholder: 'Beschreibung (optional)',
+      add: 'Hinzufügen',
+      addError: 'Tag konnte nicht hinzugefügt werden',
+      deleteTitle: 'RFID-Tag löschen?',
+      delete: 'Löschen',
+      noTags: 'Keine RFID-Karten',
     },
     walletHistory: {
       title: 'Wallet-Verlauf',
@@ -1569,6 +1853,22 @@ export const translations: Record<Language, Translations> = {
       removeVehicleConfirm: 'Czy chcesz usunąć ten pojazd?',
       yes: 'Tak',
       no: 'Nie',
+      // Section headers & menu labels
+      walletSection: 'Portfel i płatności',
+      discoverSection: 'Odkryj',
+      achievements: 'Osiągnięcia',
+      topUpCredit: 'Doładuj saldo',
+      myCards: 'Moje karty',
+      shop: 'Sklep',
+      communityEnergy: 'Energetyka społeczna',
+      eRoaming: 'eRoaming (Hubject)',
+      currency: 'Waluta',
+      // Custom vehicle placeholders & validation
+      maxPowerPlaceholder: 'Maks. moc ładowania kW (np. 150)',
+      macPlaceholder: 'MAC (np. 98:ED:5C:89:BE:0E)',
+      enterVehicleName: 'Podaj nazwę pojazdu',
+      enterBatteryCapacity: 'Podaj pojemność baterii w kWh',
+      enterAvgConsumption: 'Podaj średnie zużycie w kWh/100 km',
     },
     reservations: {
       title: 'Rezerwacje',
@@ -1715,6 +2015,59 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Ładowanie rozpoczęte',
       chargingStartedAt: 'Ładowanie na {station} zostało pomyślnie rozpoczęte.',
       chargingCompleteTitle: 'Ładowanie zakończone',
+    },
+    achievements: {
+      title: 'Osiągnięcia',
+      earnedCount: 'Zdobyte osiągnięcia',
+      earned: 'Zdobyte',
+      inProgress: 'W trakcie',
+    },
+    community: {
+      title: 'Energetyka społeczna',
+      members: 'członków',
+      myShare: 'Mój udział',
+      consumed: 'Zużyto',
+      saved: 'Zaoszczędzono',
+      thisMonth: 'W tym miesiącu',
+      billing: 'Rozliczenie',
+      noBilling: 'Brak rozliczeń',
+      infoText: 'Energetyka społeczna pozwala dzielić się wyprodukowaną energią między członkami społeczności i oszczędzać na rachunkach za prąd.',
+      availableCommunities: 'Dostępne społeczności',
+      noCommunities: 'Brak aktywnych społeczności',
+      loginTitle: 'Logowanie',
+      loginMessage: 'Zaloguj się najpierw, aby dołączyć do społeczności.',
+      applySentTitle: 'Wniosek wysłany',
+      applySentMessage: 'Po zatwierdzeniu zobaczysz tutaj swoje statystyki.',
+      applyError: 'Nie udało się wysłać wniosku',
+      roleQuestion: 'Jesteś producentem energii czy konsumentem?',
+      producer: 'Producent',
+      consumer: 'Zużycie',
+    },
+    priceAlerts: {
+      title: 'Alerty cenowe',
+      newAlert: 'Nowy alert',
+      spotPriceLabel: 'Cena spot (CZK/kWh)',
+      whenBelow: 'Gdy poniżej',
+      whenAbove: 'Gdy powyżej',
+      createAlert: 'Utwórz alert',
+      invalidValue: 'Nieprawidłowa wartość',
+      deleteTitle: 'Usunąć alert?',
+      delete: 'Usuń',
+      whenPriceBelow: 'Gdy cena poniżej',
+      whenPriceAbove: 'Gdy cena powyżej',
+      via: 'via',
+      noAlerts: 'Brak aktywnych alertów',
+    },
+    rfidTags: {
+      title: 'Karty RFID',
+      addTag: 'Dodaj tag RFID',
+      uidPlaceholder: 'UID karty (np. ABCD1234)',
+      descPlaceholder: 'Opis (opcjonalnie)',
+      add: 'Dodaj',
+      addError: 'Nie udało się dodać tagu',
+      deleteTitle: 'Usunąć tag RFID?',
+      delete: 'Usuń',
+      noTags: 'Brak kart RFID',
     },
     walletHistory: {
       title: 'Historia portfela',

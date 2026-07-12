@@ -7,12 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchMyRfidTags, addRfidTag, deleteRfidTag, MyRfidTag } from '../../lib/v2Features';
 
 export default function RfidTagsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const [tags, setTags] = useState<MyRfidTag[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTag, setNewTag] = useState('');
@@ -36,14 +38,14 @@ export default function RfidTagsScreen() {
       setNewDesc('');
       load();
     } else {
-      Alert.alert('Chyba', 'Tag se nepodařilo přidat');
+      Alert.alert(t.common.error, t.rfidTags.addError);
     }
   };
 
   const onDelete = (tag: MyRfidTag) => {
-    Alert.alert('Smazat RFID tag?', tag.id_tag, [
-      { text: 'Zrušit', style: 'cancel' },
-      { text: 'Smazat', style: 'destructive', onPress: () => deleteRfidTag(tag.id).then(load) },
+    Alert.alert(t.rfidTags.deleteTitle, tag.id_tag, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.rfidTags.delete, style: 'destructive', onPress: () => deleteRfidTag(tag.id).then(load) },
     ]);
   };
 
@@ -51,15 +53,15 @@ export default function RfidTagsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'RFID karty', headerShown: true }} />
+      <Stack.Screen options={{ title: t.rfidTags.title, headerShown: true }} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.addCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Text style={[styles.title, { color: colors.text }]}>Přidat RFID tag</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t.rfidTags.addTag}</Text>
             <TextInput
               value={newTag}
               onChangeText={setNewTag}
-              placeholder="UID karty (např. ABCD1234)"
+              placeholder={t.rfidTags.uidPlaceholder}
               placeholderTextColor={colors.textMuted}
               autoCapitalize="characters"
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
@@ -67,7 +69,7 @@ export default function RfidTagsScreen() {
             <TextInput
               value={newDesc}
               onChangeText={setNewDesc}
-              placeholder="Popis (volitelné)"
+              placeholder={t.rfidTags.descPlaceholder}
               placeholderTextColor={colors.textMuted}
               style={[styles.input, { color: colors.text, borderColor: colors.border, marginTop: 8 }]}
             />
@@ -76,12 +78,12 @@ export default function RfidTagsScreen() {
               disabled={!newTag.trim()}
               style={[styles.addBtn, { backgroundColor: newTag.trim() ? Colors.brand.accentGreen : colors.textMuted }]}
             >
-              <Text style={styles.addBtnText}>Přidat</Text>
+              <Text style={styles.addBtnText}>{t.rfidTags.add}</Text>
             </TouchableOpacity>
           </View>
 
           {tags.length === 0 ? (
-            <Text style={[styles.empty, { color: colors.textMuted }]}>Žádné RFID karty</Text>
+            <Text style={[styles.empty, { color: colors.textMuted }]}>{t.rfidTags.noTags}</Text>
           ) : (
             tags.map((t) => (
               <View key={t.id} style={[styles.tagCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>

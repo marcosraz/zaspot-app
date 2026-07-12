@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
@@ -14,6 +15,7 @@ import { fetchPriceAlerts, createPriceAlert, deletePriceAlert, PriceAlert } from
 
 export default function PriceAlertsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const { format } = useCurrency();
   const [alerts, setAlerts] = useState<PriceAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,13 +33,13 @@ export default function PriceAlertsScreen() {
   }, []);
 
   const onAdd = async () => {
-    const t = parseFloat(threshold);
-    if (isNaN(t) || t <= 0) {
-      Alert.alert('Neplatná hodnota');
+    const val = parseFloat(threshold);
+    if (isNaN(val) || val <= 0) {
+      Alert.alert(t.priceAlerts.invalidValue);
       return;
     }
     const res = await createPriceAlert({
-      threshold_czk_kwh: t,
+      threshold_czk_kwh: val,
       direction,
       is_active: true,
       notify_via: 'push',
@@ -49,9 +51,9 @@ export default function PriceAlertsScreen() {
   };
 
   const onDelete = (a: PriceAlert) => {
-    Alert.alert('Smazat alert?', `${a.direction} ${format(a.threshold_czk_kwh, { perKwh: true })}`, [
-      { text: 'Zrušit', style: 'cancel' },
-      { text: 'Smazat', style: 'destructive', onPress: () => deletePriceAlert(a.id).then(load) },
+    Alert.alert(t.priceAlerts.deleteTitle, `${a.direction} ${format(a.threshold_czk_kwh, { perKwh: true })}`, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.priceAlerts.delete, style: 'destructive', onPress: () => deletePriceAlert(a.id).then(load) },
     ]);
   };
 
@@ -59,12 +61,12 @@ export default function PriceAlertsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Cenové alerty', headerShown: true }} />
+      <Stack.Screen options={{ title: t.priceAlerts.title, headerShown: true }} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            <Text style={[styles.title, { color: colors.text }]}>Nový alert</Text>
-            <Text style={[styles.label, { color: colors.textMuted }]}>Spot cena (Kč/kWh)</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{t.priceAlerts.newAlert}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t.priceAlerts.spotPriceLabel}</Text>
             <TextInput
               value={threshold}
               onChangeText={setThreshold}
@@ -72,16 +74,16 @@ export default function PriceAlertsScreen() {
               style={[styles.input, { color: colors.text, borderColor: colors.border }]}
             />
             <View style={styles.dirRow}>
-              <DirBtn label="Když pod" selected={direction === 'below'} onPress={() => setDirection('below')} colors={colors} />
-              <DirBtn label="Když nad" selected={direction === 'above'} onPress={() => setDirection('above')} colors={colors} />
+              <DirBtn label={t.priceAlerts.whenBelow} selected={direction === 'below'} onPress={() => setDirection('below')} colors={colors} />
+              <DirBtn label={t.priceAlerts.whenAbove} selected={direction === 'above'} onPress={() => setDirection('above')} colors={colors} />
             </View>
             <TouchableOpacity onPress={onAdd} style={[styles.btn, { backgroundColor: Colors.brand.accentGreen }]}>
-              <Text style={styles.btnText}>Vytvořit alert</Text>
+              <Text style={styles.btnText}>{t.priceAlerts.createAlert}</Text>
             </TouchableOpacity>
           </View>
 
           {alerts.length === 0 ? (
-            <Text style={[styles.empty, { color: colors.textMuted }]}>Žádné aktivní alerty</Text>
+            <Text style={[styles.empty, { color: colors.textMuted }]}>{t.priceAlerts.noAlerts}</Text>
           ) : (
             alerts.map((a) => (
               <View key={a.id} style={[styles.alertRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
@@ -92,10 +94,10 @@ export default function PriceAlertsScreen() {
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.alertLabel, { color: colors.text }]}>
-                    {a.direction === 'below' ? 'Když cena pod' : 'Když cena nad'} {format(a.threshold_czk_kwh, { perKwh: true })}
+                    {a.direction === 'below' ? t.priceAlerts.whenPriceBelow : t.priceAlerts.whenPriceAbove} {format(a.threshold_czk_kwh, { perKwh: true })}
                   </Text>
                   <Text style={[styles.alertSub, { color: colors.textMuted }]}>
-                    via {a.notify_via}
+                    {t.priceAlerts.via} {a.notify_via}
                   </Text>
                 </View>
                 <TouchableOpacity onPress={() => onDelete(a)}>

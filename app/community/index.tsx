@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useAuth } from '../../context/AuthContext';
 import { Colors } from '../../constants/colors';
@@ -23,6 +24,7 @@ import {
 
 export default function CommunityScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const { format } = useCurrency();
   const { user } = useAuth();
   const [community, setCommunity] = useState<CommunityInfo | null>(null);
@@ -65,24 +67,24 @@ export default function CommunityScreen() {
     const email = user?.email;
     const fullName = user?.name || user?.email?.split('@')[0] || '';
     if (!email) {
-      Alert.alert('Přihlášení', 'Pro vstup do komunity se nejprve přihlaste.');
+      Alert.alert(t.community.loginTitle, t.community.loginMessage);
       return;
     }
     const res = await applyToCommunity(c.id, { fullName, email, applicationType });
     if (res.ok && res.data?.success) {
-      Alert.alert('Žádost odeslána', 'Po schválení uvidíte své statistiky zde.');
+      Alert.alert(t.community.applySentTitle, t.community.applySentMessage);
       await load();
     } else {
-      Alert.alert('Chyba', res.data?.error || 'Žádost se nepodařilo odeslat');
+      Alert.alert(t.common.error, res.data?.error || t.community.applyError);
     }
   };
 
   const apply = (c: CommunityInfo) => {
     // The apply endpoint needs a role; ask producer vs. consumer.
-    Alert.alert(c.name, 'Jste výrobce energie, nebo spotřebitel?', [
-      { text: 'Zrušit', style: 'cancel' },
-      { text: 'Výrobna', onPress: () => doApply(c, 'vyrobna') },
-      { text: 'Spotřeba', onPress: () => doApply(c, 'spotreba') },
+    Alert.alert(c.name, t.community.roleQuestion, [
+      { text: t.common.cancel, style: 'cancel' },
+      { text: t.community.producer, onPress: () => doApply(c, 'vyrobna') },
+      { text: t.community.consumer, onPress: () => doApply(c, 'spotreba') },
     ]);
   };
 
@@ -90,7 +92,7 @@ export default function CommunityScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Komunitní energetika', headerShown: true }} />
+      <Stack.Screen options={{ title: t.community.title, headerShown: true }} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView
           contentContainerStyle={styles.content}
@@ -102,7 +104,7 @@ export default function CommunityScreen() {
                 <Ionicons name="leaf" size={32} color={Colors.brand.accentGreen} />
                 <Text style={[styles.heroName, { color: colors.text }]}>{community.name}</Text>
                 <Text style={[styles.heroMeta, { color: colors.textMuted }]}>
-                  {community.region ?? '–'} · {community.member_count} členů
+                  {community.region ?? '–'} · {community.member_count} {t.community.members}
                 </Text>
               </View>
 
@@ -110,36 +112,36 @@ export default function CommunityScreen() {
                 <View style={styles.statsGrid}>
                   <StatCard
                     icon="flash"
-                    label="Můj podíl"
+                    label={t.community.myShare}
                     value={`${stats.my_share_percent.toFixed(1)} %`}
                     colors={colors}
                   />
                   <StatCard
                     icon="speedometer"
-                    label="Spotřebováno"
+                    label={t.community.consumed}
                     value={`${stats.my_energy_kwh.toFixed(0)} kWh`}
                     colors={colors}
                   />
                   <StatCard
                     icon="cash"
-                    label="Ušetřeno"
+                    label={t.community.saved}
                     value={format(stats.my_savings_czk, { decimals: 0 })}
                     highlight
                     colors={colors}
                   />
                   <StatCard
                     icon="calendar"
-                    label="Tento měsíc"
+                    label={t.community.thisMonth}
                     value={`${stats.current_month_energy_kwh.toFixed(1)} kWh`}
                     colors={colors}
                   />
                 </View>
               )}
 
-              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Vyúčtování</Text>
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t.community.billing}</Text>
               {billings.length === 0 ? (
                 <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-                  <Text style={{ color: colors.textMuted }}>Zatím žádné vyúčtování</Text>
+                  <Text style={{ color: colors.textMuted }}>{t.community.noBilling}</Text>
                 </View>
               ) : (
                 billings.map((b) => (
@@ -158,13 +160,13 @@ export default function CommunityScreen() {
               <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
                 <Ionicons name="information-circle" size={28} color={Colors.brand.accentGreen} />
                 <Text style={[styles.infoText, { color: colors.text }]}>
-                  Komunitní energetika umožňuje sdílet vyrobenou energii mezi členy komunity a šetřit za elektřinu.
+                  {t.community.infoText}
                 </Text>
               </View>
 
-              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>Dostupné komunity</Text>
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t.community.availableCommunities}</Text>
               {available.length === 0 ? (
-                <Text style={{ color: colors.textMuted, padding: 14 }}>Žádné aktivní komunity</Text>
+                <Text style={{ color: colors.textMuted, padding: 14 }}>{t.community.noCommunities}</Text>
               ) : (
                 available.map((c) => (
                   <TouchableOpacity key={c.id} onPress={() => apply(c)}>
@@ -172,7 +174,7 @@ export default function CommunityScreen() {
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.communityName, { color: colors.text }]}>{c.name}</Text>
                         <Text style={[styles.communityMeta, { color: colors.textMuted }]}>
-                          {c.region ?? '–'} · {c.member_count} členů
+                          {c.region ?? '–'} · {c.member_count} {t.community.members}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />

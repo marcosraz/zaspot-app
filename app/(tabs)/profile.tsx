@@ -106,9 +106,9 @@ export default function ProfileScreen() {
     const name = customVehName.trim();
     const battery = parseFloat(customVehBattery.replace(',', '.'));
     const consumption = parseFloat(customVehConsumption.replace(',', '.'));
-    if (!name) { Alert.alert('Chyba', 'Zadejte název vozidla'); return; }
-    if (!(battery > 0)) { Alert.alert('Chyba', 'Zadejte kapacitu baterie v kWh'); return; }
-    if (!(consumption > 0)) { Alert.alert('Chyba', 'Zadejte průměrnou spotřebu v kWh/100 km'); return; }
+    if (!name) { Alert.alert(t.common.error, t.profile.enterVehicleName); return; }
+    if (!(battery > 0)) { Alert.alert(t.common.error, t.profile.enterBatteryCapacity); return; }
+    if (!(consumption > 0)) { Alert.alert(t.common.error, t.profile.enterAvgConsumption); return; }
     // Existing route/range logic is range-based; derive range from battery + consumption.
     const rangeKm = Math.round((battery / consumption) * 100);
     // Max charging power caps the route planner's charge speed. Optional field;
@@ -416,7 +416,7 @@ export default function ProfileScreen() {
             {/* Currency Toggle (CZK / EUR) — display only, billing stays CZK */}
             <MenuItem
               icon="cash-outline"
-              label={language === 'de' ? 'Währung' : language === 'cz' ? 'Měna' : language === 'pl' ? 'Waluta' : 'Currency'}
+              label={t.profile.currency}
               value={currency === 'eur' ? 'EUR (€)' : 'CZK (Kč)'}
               onPress={toggleCurrency}
               iconColor={Colors.brand.accentGreen}
@@ -575,7 +575,7 @@ export default function ProfileScreen() {
                     />
                     <TextInput
                       style={[styles.customVehicleInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.surface }]}
-                      placeholder="Max. nabíjecí výkon kW (např. 150)"
+                      placeholder={t.profile.maxPowerPlaceholder}
                       placeholderTextColor={colors.textMuted}
                       keyboardType="numeric"
                       value={customVehMaxPower}
@@ -786,7 +786,7 @@ export default function ProfileScreen() {
                             style={[styles.registerInput, { backgroundColor: colors.surface, color: colors.text, borderColor: colors.border }]}
                             value={manualMac}
                             onChangeText={setManualMac}
-                            placeholder="MAC (e.g. 98:ED:5C:89:BE:0E)"
+                            placeholder={t.profile.macPlaceholder}
                             placeholderTextColor={colors.textMuted}
                             autoCapitalize="characters"
                           />
@@ -925,14 +925,14 @@ export default function ProfileScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="notifications-circle"
-              label="Cenové alerty"
+              label={t.profile.priceAlerts}
               onPress={() => router.push('/price-alerts')}
               iconColor="#EF4444"
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="trophy"
-              label="Úspěchy"
+              label={t.profile.achievements}
               onPress={() => router.push('/achievements')}
               iconColor="#F59E0B"
             />
@@ -941,11 +941,11 @@ export default function ProfileScreen() {
 
         {/* Wallet & Payments */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Peněženka & platby</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t.profile.walletSection}</Text>
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
             <MenuItem
               icon="wallet"
-              label="Dobít kredit"
+              label={t.profile.topUpCredit}
               onPress={() => router.push('/top-up')}
               iconColor="#16A34A"
             />
@@ -959,14 +959,14 @@ export default function ProfileScreen() {
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="card"
-              label="Moje karty"
+              label={t.profile.myCards}
               onPress={() => router.push('/cards')}
               iconColor="#3B82F6"
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="hardware-chip"
-              label="RFID karty"
+              label={t.profile.rfidCards}
               onPress={() => router.push('/rfid-tags')}
               iconColor="#8B5CF6"
             />
@@ -975,25 +975,25 @@ export default function ProfileScreen() {
 
         {/* Discover */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Objevit</Text>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t.profile.discoverSection}</Text>
           <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
             <MenuItem
               icon="cart"
-              label="Obchod"
+              label={t.profile.shop}
               onPress={() => router.push('/shop')}
               iconColor="#16A34A"
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="leaf"
-              label="Komunitní energetika"
+              label={t.profile.communityEnergy}
               onPress={() => router.push('/community')}
               iconColor="#10B981"
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="globe"
-              label="eRoaming (Hubject)"
+              label={t.profile.eRoaming}
               onPress={() => router.push('/emp-stations')}
               iconColor="#06B6D4"
             />

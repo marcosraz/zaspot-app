@@ -7,12 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { fetchMyAchievements, Achievement } from '../../lib/v2Features';
 
 export default function AchievementsScreen() {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,26 +33,26 @@ export default function AchievementsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Úspěchy', headerShown: true }} />
+      <Stack.Screen options={{ title: t.achievements.title, headerShown: true }} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.summary, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
             <Text style={[styles.summaryValue, { color: Colors.brand.accentGreen }]}>
               {earned.length}/{achievements.length}
             </Text>
-            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>Získané úspěchy</Text>
+            <Text style={[styles.summaryLabel, { color: colors.textMuted }]}>{t.achievements.earnedCount}</Text>
           </View>
 
           {earned.length > 0 && (
             <>
-              <Text style={[styles.section, { color: colors.textSecondary }]}>Získané</Text>
+              <Text style={[styles.section, { color: colors.textSecondary }]}>{t.achievements.earned}</Text>
               {earned.map((a) => <AchCard key={a.id} a={a} earned colors={colors} />)}
             </>
           )}
 
           {inProgress.length > 0 && (
             <>
-              <Text style={[styles.section, { color: colors.textSecondary }]}>V průběhu</Text>
+              <Text style={[styles.section, { color: colors.textSecondary }]}>{t.achievements.inProgress}</Text>
               {inProgress.map((a) => <AchCard key={a.id} a={a} colors={colors} />)}
             </>
           )}
