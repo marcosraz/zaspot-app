@@ -31,8 +31,10 @@ import {
   requestBankTransfer,
   fetchActiveBankTransfers,
   cancelBankTransfer,
+  fetchMyCards,
   BankTransferInfo,
   PendingTransfer,
+  SavedCard,
 } from '../../lib/v2Features';
 
 const PRESETS = [100, 250, 500, 1000, 2000, 5000];
@@ -51,6 +53,14 @@ export default function TopUpScreen() {
   const [selectedPreset, setSelectedPreset] = useState<number | null>(500);
   const [customAmount, setCustomAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Saved card → the backend CIT fast path will charge it instantly without a
+  // browser. Shown as a hint so instant capture doesn't surprise the user.
+  const [savedCard, setSavedCard] = useState<SavedCard | null>(null);
+  useEffect(() => {
+    fetchMyCards()
+      .then((res) => setSavedCard(res.ok && res.data.cards?.length ? res.data.cards[0] : null))
+      .catch(() => {});
+  }, []);
 
   // Bank transfer state
   const [bankResult, setBankResult] = useState<BankTransferInfo | null>(null);
@@ -106,10 +116,11 @@ export default function TopUpScreen() {
         ? 'Předchozí platba se ještě zpracovává. Počkejte prosím, nebo ji zrušte.'
         : result.error || 'Zkuste to prosím znovu.';
       Alert.alert('Platbu se nepodařilo zahájit', msg);
+    } else if (result.completed) {
+      // Instant saved-card (CIT) capture — no browser, credit is already there.
+      Alert.alert('Dobito ✓', `${amount} Kč bylo zaplaceno uloženou kartou a připsáno na účet.`);
     } else {
-      // Success = payment created (browser opened or CIT completed). The
-      // balance is refreshed by the pending-payment poll on return — for the
-      // instant CIT path topUp() already refreshed it.
+      // Browser payment in flight — the pending banner + balance poll take over.
       await refreshBalance();
     }
   };
@@ -270,11 +281,21 @@ export default function TopUpScreen() {
                 </Text>
               </TouchableOpacity>
 
-              <Text style={[styles.hint, { color: colors.textMuted }]}>
-                „Dobít" otevře zabezpečenou platební bránu s výběrem karty
-                (Visa, Mastercard) i peněženek. Tlačítko {walletMethod === 'APAY' ? 'Apple Pay' : 'Google Pay'} přejde
-                rovnou na platbu peněženkou.
-              </Text>
+              {savedCard ? (
+                <View style={[styles.savedCardHint, { backgroundColor: Colors.brand.accentGreen + '12' }]}>
+                  <Ionicons name="card" size={16} color={Colors.brand.accentGreen} />
+                  <Text style={[styles.savedCardHintText, { color: colors.textSecondary }]}>
+                    „Dobít" zaplatí okamžitě uloženou kartou
+                    {savedCard.masked_pan && savedCard.masked_pan !== 'Uložená karta' ? ` (${savedCard.masked_pan})` : ''} — bez prohlížeče.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.hint, { color: colors.textMuted }]}>
+                  „Dobít" otevře zabezpečenou platební bránu s výběrem karty
+                  (Visa, Mastercard) i peněženek. Tlačítko {walletMethod === 'APAY' ? 'Apple Pay' : 'Google Pay'} přejde
+                  rovnou na platbu peněženkou.
+                </Text>
+              )}
             </>
           )}
 
@@ -507,6 +528,8 @@ const styles = StyleSheet.create({
   pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
   pendingTitle: { fontSize: 14, fontWeight: '700' },
   pendingSub: { fontSize: 12, marginTop: 2 },
+  savedCardHint: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 10 },
+  savedCardHintText: { fontSize: 12, flex: 1 },
   balanceLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   balanceValue: { fontSize: 32, fontWeight: '700', marginTop: 6 },
 

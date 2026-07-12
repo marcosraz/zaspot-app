@@ -26,7 +26,10 @@ interface CreditContextType {
   balanceFormatted: string;
   loading: boolean;
   refreshBalance: () => Promise<void>;
-  topUp: (amountCzk: number, payMethod?: 'GPAY' | 'APAY') => Promise<{ success: boolean; error?: string }>;
+  /** `completed: true` = instant saved-card (CIT) capture, no browser opened —
+   *  the balance is already refreshed. Otherwise the external browser handles
+   *  payment and `paymentPending` tracks it. */
+  topUp: (amountCzk: number, payMethod?: 'GPAY' | 'APAY') => Promise<{ success: boolean; completed?: boolean; error?: string }>;
   /** A browser payment was opened and hasn't been confirmed yet — UI should
    *  show a "processing" state and block starting a second payment. */
   paymentPending: boolean;
@@ -164,7 +167,7 @@ export function CreditProvider({ children }: CreditProviderProps) {
   const topUp = useCallback(async (
     amountCzk: number,
     payMethod?: 'GPAY' | 'APAY'
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; completed?: boolean; error?: string }> => {
     // Double-payment guard: one browser payment at a time. The button UI also
     // disables on paymentPending, this is the belt-and-braces check.
     if (pendingSinceRef.current != null) {
@@ -198,7 +201,7 @@ export function CreditProvider({ children }: CreditProviderProps) {
       // to open. Just refresh the balance and report success.
       if (res.ok && res.data?.completed) {
         await fetchBalance();
-        return { success: true };
+        return { success: true, completed: true };
       }
 
       // Backend returns `payment_url` (snake_case). Older fallback for `paymentUrl`.

@@ -951,6 +951,13 @@ export default function ProfileScreen() {
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
+              icon="receipt"
+              label={t.walletHistory.title}
+              onPress={() => router.push('/wallet-history')}
+              iconColor="#F59E0B"
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <MenuItem
               icon="card"
               label="Moje karty"
               onPress={() => router.push('/cards')}

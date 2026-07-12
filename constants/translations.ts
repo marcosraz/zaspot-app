@@ -352,6 +352,20 @@ export interface Translations {
     chargingCompleteTitle: string;
   };
 
+  // Wallet transaction history
+  walletHistory: {
+    title: string;
+    empty: string;
+    emptyHint: string;
+    loginRequired: string;
+    typeTopup: string;
+    typeCharge: string;
+    typeRefund: string;
+    typeAdjustment: string;
+    typeCommunity: string;
+    typeBankTransfer: string;
+  };
+
   // Company info
   company: {
     name: string;
@@ -682,6 +696,18 @@ export const translations: Record<Language, Translations> = {
       chargingStartedAt: 'Nabíjení na {station} bylo úspěšně zahájeno.',
       chargingCompleteTitle: 'Nabíjení dokončeno',
     },
+    walletHistory: {
+      title: 'Historie peněženky',
+      empty: 'Zatím žádné pohyby',
+      emptyHint: 'Dobití kreditu a platby za nabíjení se zobrazí zde.',
+      loginRequired: 'Pro zobrazení historie se přihlaste',
+      typeTopup: 'Dobití kreditu',
+      typeCharge: 'Nabíjení',
+      typeRefund: 'Vrácení peněz',
+      typeAdjustment: 'Úprava zůstatku',
+      typeCommunity: 'Komunitní kredit',
+      typeBankTransfer: 'Bankovní převod',
+    },
     company: {
       name: 'sdil s.r.o.',
       phone: '+420 770 103 103',
@@ -1009,6 +1035,18 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Charging started',
       chargingStartedAt: 'Charging at {station} has been started successfully.',
       chargingCompleteTitle: 'Charging complete',
+    },
+    walletHistory: {
+      title: 'Wallet History',
+      empty: 'No transactions yet',
+      emptyHint: 'Top-ups and charging payments will appear here.',
+      loginRequired: 'Sign in to view your history',
+      typeTopup: 'Top-up',
+      typeCharge: 'Charging',
+      typeRefund: 'Refund',
+      typeAdjustment: 'Balance adjustment',
+      typeCommunity: 'Community credit',
+      typeBankTransfer: 'Bank transfer',
     },
     company: {
       name: 'sdil s.r.o.',
@@ -1338,6 +1376,18 @@ export const translations: Record<Language, Translations> = {
       chargingStartedAt: 'Laden an {station} wurde erfolgreich gestartet.',
       chargingCompleteTitle: 'Laden abgeschlossen',
     },
+    walletHistory: {
+      title: 'Wallet-Verlauf',
+      empty: 'Noch keine Bewegungen',
+      emptyHint: 'Aufladungen und Ladezahlungen erscheinen hier.',
+      loginRequired: 'Zum Anzeigen des Verlaufs anmelden',
+      typeTopup: 'Aufladung',
+      typeCharge: 'Ladevorgang',
+      typeRefund: 'Rückerstattung',
+      typeAdjustment: 'Saldo-Anpassung',
+      typeCommunity: 'Community-Guthaben',
+      typeBankTransfer: 'Banküberweisung',
+    },
     company: {
       name: 'sdil s.r.o.',
       phone: '+420 770 103 103',
@@ -1665,6 +1715,18 @@ export const translations: Record<Language, Translations> = {
       chargingStartedTitle: 'Ładowanie rozpoczęte',
       chargingStartedAt: 'Ładowanie na {station} zostało pomyślnie rozpoczęte.',
       chargingCompleteTitle: 'Ładowanie zakończone',
+    },
+    walletHistory: {
+      title: 'Historia portfela',
+      empty: 'Brak transakcji',
+      emptyHint: 'Doładowania i płatności za ładowanie pojawią się tutaj.',
+      loginRequired: 'Zaloguj się, aby zobaczyć historię',
+      typeTopup: 'Doładowanie',
+      typeCharge: 'Ładowanie',
+      typeRefund: 'Zwrot',
+      typeAdjustment: 'Korekta salda',
+      typeCommunity: 'Kredyt społecznościowy',
+      typeBankTransfer: 'Przelew bankowy',
     },
     company: {
       name: 'sdil s.r.o.',
