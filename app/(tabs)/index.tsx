@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import { useTheme } from '../../context/ThemeContext';
+import { useFocusedInterval } from '../../hooks/useFocusedInterval';
 import { useLanguage } from '../../context/LanguageContext';
 import { useFavorites } from '../../context/FavoritesContext';
 import { useNotifications } from '../../context/NotificationsContext';
@@ -129,17 +130,12 @@ export default function HomeScreen() {
     loadData();
   }, [loadData]);
 
-  // Auto-refresh prices every 60 seconds
-  const priceRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  useEffect(() => {
-    priceRefreshRef.current = setInterval(async () => {
-      const ep = await fetchEffectivePrices();
-      if (ep) setEffectivePrices(ep);
-    }, 60 * 1000);
-    return () => {
-      if (priceRefreshRef.current) clearInterval(priceRefreshRef.current);
-    };
-  }, []);
+  // Auto-refresh prices every 60 seconds — only while home is visible and the
+  // app is foregrounded (tabs stay mounted, so plain intervals never stop).
+  useFocusedInterval(async () => {
+    const ep = await fetchEffectivePrices();
+    if (ep) setEffectivePrices(ep);
+  }, 60 * 1000);
 
   const onRefresh = async () => {
     setRefreshing(true);

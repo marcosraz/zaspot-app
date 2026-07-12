@@ -55,6 +55,13 @@ export default function ScanScreen() {
   const [manualCode, setManualCode] = useState('');
   const handlingRef = useRef(false);
   const askedRef = useRef(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+    };
+  }, []);
 
   // Auto-request camera permission once on mount when allowed.
   // IMPORTANT: this effect depends on `permission`, which changes after every
@@ -74,8 +81,10 @@ export default function ScanScreen() {
 
   const navigateToStation = (chargePointId: string, connector?: string) => {
     setNavigating(true); // brief confirmation overlay before the screen changes
-    // Reset scanner after a delay so user can scan another if they come back
-    setTimeout(() => {
+    // Reset scanner after a delay so user can scan another if they come back.
+    // Timer is held in a ref and cleared on unmount — otherwise it fires
+    // setState on an unmounted component if the user leaves within 1.5s.
+    resetTimerRef.current = setTimeout(() => {
       handlingRef.current = false;
       setScanned(false);
       setNavigating(false);

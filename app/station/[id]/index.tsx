@@ -46,6 +46,7 @@ import {
   fetchStationTariffPrices,
   StationTariffPrices,
 } from '../../../lib/pricing';
+import { useFocusedInterval } from '../../../hooks/useFocusedInterval';
 import { createReservation } from '../../../lib/reservations';
 import { openNavigationTo } from '../../../lib/navigation';
 
@@ -71,7 +72,6 @@ export default function StationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // 'start-N' or 'stop-N'
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ─── Data Fetching ─────────────────────────────
 
@@ -105,16 +105,11 @@ export default function StationDetailScreen() {
     loadStation(true);
   }, [loadStation]);
 
-  // Poll every 5 seconds for real-time connector status
-  useEffect(() => {
-    pollRef.current = setInterval(() => {
-      loadStation(false);
-    }, 5000);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, [loadStation]);
+  // Poll every 5 seconds for real-time connector status — but ONLY while this
+  // screen is focused and the app is foregrounded. loadStation fires 4 network
+  // requests per tick; before this gating it kept running when the user
+  // navigated away (stack screens stay mounted) or backgrounded the app.
+  useFocusedInterval(() => loadStation(false), 5000);
 
   const onRefresh = async () => {
     setRefreshing(true);

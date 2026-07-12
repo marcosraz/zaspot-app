@@ -6,7 +6,7 @@
  * and a spring entrance when a session appears.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -24,6 +24,7 @@ import { fetchUserTransactions, UserTransaction, formatDuration, formatEnergy } 
 import { parseDbDateMs } from '../lib/dates';
 import { Layout } from '../constants/layout';
 import PressableScale from './ui/PressableScale';
+import { useFocusedInterval } from '../hooks/useFocusedInterval';
 
 const POLL_INTERVAL = 10_000; // 10 seconds
 
@@ -32,8 +33,6 @@ export default function ActiveChargingWidget() {
   const router = useRouter();
   const [session, setSession] = useState<UserTransaction | null>(null);
   const [elapsed, setElapsed] = useState('');
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pulsing ring around the bolt — scale + fade out, looped.
   const ringScale = useSharedValue(1);
@@ -52,32 +51,27 @@ export default function ActiveChargingWidget() {
     }
   }, [user]);
 
-  // Poll for active sessions
+  // Refetch immediately when the user changes (login/logout)
   useEffect(() => {
     fetchActiveSession();
-    pollRef.current = setInterval(fetchActiveSession, POLL_INTERVAL);
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
   }, [fetchActiveSession]);
 
-  // Live elapsed time ticker
-  useEffect(() => {
-    if (!session) return;
+  // Poll for active sessions — focus/foreground-gated (the home tab stays
+  // mounted behind other tabs, so a plain interval would poll forever).
+  useFocusedInterval(fetchActiveSession, POLL_INTERVAL, { immediate: true });
 
-    const updateElapsed = () => {
+  // Live elapsed time ticker — only while a session is showing AND the tab is
+  // actually visible; per-second setState off-screen is wasted re-renders.
+  useFocusedInterval(
+    () => {
+      if (!session) return;
       const start = parseDbDateMs(session.startTimestamp);
-      const now = Date.now();
-      const mins = (now - start) / 60_000;
+      const mins = (Date.now() - start) / 60_000;
       setElapsed(formatDuration(mins));
-    };
-
-    updateElapsed();
-    tickRef.current = setInterval(updateElapsed, 1000);
-    return () => {
-      if (tickRef.current) clearInterval(tickRef.current);
-    };
-  }, [session]);
+    },
+    1000,
+    { enabled: !!session, immediate: true }
+  );
 
   // Start the pulse loop while a session is active
   useEffect(() => {

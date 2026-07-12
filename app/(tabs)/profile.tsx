@@ -39,6 +39,7 @@ import {
   registerRfidCard,
 } from '../../lib/vehicles';
 import Constants from 'expo-constants';
+import { useFocusedInterval } from '../../hooks/useFocusedInterval';
 
 interface MenuItemProps {
   icon: keyof typeof Ionicons.glyphMap;
@@ -170,11 +171,11 @@ export default function ProfileScreen() {
   // Live-poll while the AutoCharge section is open so a car the user is currently
   // charging (just detected at a station) appears without re-opening the section.
   // Matches the web charge page's 5s polling; silent so it doesn't flash a spinner.
-  useEffect(() => {
-    if (!showAutoCharge || !isAuthenticated) return;
-    const interval = setInterval(() => loadAutoCharge(true), 6000);
-    return () => clearInterval(interval);
-  }, [showAutoCharge, isAuthenticated]);
+  // Focus/foreground-gated: tabs stay mounted, so a plain setInterval would keep
+  // polling from other tabs and from the background.
+  useFocusedInterval(() => loadAutoCharge(true), 6000, {
+    enabled: showAutoCharge && isAuthenticated,
+  });
 
   const handleRegisterVehicle = async (idTag: string) => {
     if (!vehicleDescription.trim()) return;

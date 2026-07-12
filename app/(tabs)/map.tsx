@@ -50,9 +50,6 @@ export default function MapScreen() {
   const { isFavorite } = useFavorites();
   const { symbol } = useCurrency();
   const insets = useSafeAreaInsets();
-  // Legacy ref slot (former native MapView). The WebView has its own ref.
-  const mapRef = useRef<unknown>(null);
-  void mapRef;
 
   // Diagnostic: tells when the WebView Leaflet map has loaded
   const [mapStatus, setMapStatus] = useState<'init' | 'ready' | 'loaded'>('init');
@@ -173,6 +170,12 @@ export default function MapScreen() {
     description: null,
   });
 
+  // Cap the pan-accumulated roaming cache: panning across Europe used to grow
+  // it without bound (tens of thousands of entries → ever-slower marker
+  // rebuilds, monotonic memory). Map preserves insertion order, so dropping
+  // the oldest entries evicts what the user panned away from longest ago.
+  const EMP_CACHE_MAX = 5000;
+
   const loadEmpForBounds = useCallback((b: { west: number; south: number; east: number; north: number }) => {
     setEmpLoading(true);
     fetchEmpStations({ bounds: `${b.west},${b.south},${b.east},${b.north}`, limit: 2500, groupByLocation: true })
@@ -181,8 +184,19 @@ export default function MapScreen() {
           const cache = empCacheRef.current;
           res.data.stations.forEach((s) => {
             const st = mapEmpToStation(s);
+            // Re-insert to refresh recency (Map keeps first-insert order otherwise)
+            cache.delete(st.id);
             cache.set(st.id, st);
           });
+          if (cache.size > EMP_CACHE_MAX) {
+            const excess = cache.size - EMP_CACHE_MAX;
+            let dropped = 0;
+            for (const key of cache.keys()) {
+              if (dropped >= excess) break;
+              cache.delete(key);
+              dropped++;
+            }
+          }
           setEmpStations(Array.from(cache.values()));
         }
       })
@@ -196,6 +210,14 @@ export default function MapScreen() {
     empDebounceRef.current = setTimeout(() => loadEmpForBounds(msg), 500);
   }, [loadEmpForBounds]);
 
+  // Clear the pending debounce on unmount — a late timer would setState on an
+  // unmounted component.
+  useEffect(() => {
+    return () => {
+      if (empDebounceRef.current) clearTimeout(empDebounceRef.current);
+    };
+  }, []);
+
   // Switching to 'Vše' → ask Leaflet for its current viewport to trigger the
   // first roaming fetch (and seed a wide CZ box as fallback while zoomed out)
   useEffect(() => {
@@ -207,12 +229,6 @@ export default function MapScreen() {
       loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 });
     }
   }, [networkFilter, loadEmpForBounds]);
-
-  const getMarkerColor = (station: ChargingStation) => {
-    if (station.status !== 'operational') return Colors.marker.offline;
-    if (!station.available) return Colors.marker.occupied;
-    return station.type === 'DC' ? '#3B82F6' : Colors.marker.available;
-  };
 
   const hasActiveFilters = filters.dcOnly || filters.acOnly || filters.availableOnly
     || filters.favoritesOnly || filters.freeParking || filters.connectorType !== null
@@ -249,7 +265,18 @@ export default function MapScreen() {
     return Array.from(types).sort();
   }, [allStations]);
 
-  const filteredStations = allStations.filter(station => {
+  // Debounced search: every keystroke used to produce a fresh filteredStations
+  // array → the marker effect re-serialized up to 2,500 markers into the
+  // WebView per keypress. 200ms of quiet keeps typing smooth.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Memoized: the marker-push effect depends on this array's identity — an
+  // inline .filter() re-created it every render and rebuilt all markers.
+  const filteredStations = useMemo(() => allStations.filter(station => {
     if (filters.dcOnly && station.type !== 'DC') return false;
     if (filters.acOnly && station.type !== 'AC') return false;
     if (filters.availableOnly && !station.available) return false;
@@ -261,8 +288,8 @@ export default function MapScreen() {
       const p = priceCtx ? getStationPriceCzk(station, priceCtx) : null;
       if (p == null || p > filters.maxPrice) return false;
     }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedQuery) {
+      const query = debouncedQuery.toLowerCase();
       return (
         station.name?.toLowerCase().includes(query) ||
         station.city?.toLowerCase().includes(query) ||
@@ -270,7 +297,7 @@ export default function MapScreen() {
       );
     }
     return true;
-  });
+  }), [allStations, filters, debouncedQuery, priceCtx, isFavorite]);
 
   // "Nejlevnější v okolí" — filtered stations within 30 km of the user
   // (whole filtered set as fallback without GPS), price-ascending, top 20.
@@ -442,7 +469,9 @@ export default function MapScreen() {
   window.updateMarkers = function(stations) {
     markerCluster.clearLayers();
     const markers = stations.map(function(s) {
-      const color = s.isOcpp ? '#16A34A' : (s.isEmp ? '#06B6D4' : (s.available ? '#3B82F6' : '#9CA3AF'));
+      // EMP roaming pins reflect availability too — a permanently-cyan pin made
+      // occupied roaming stations look free.
+      const color = s.isOcpp ? '#16A34A' : (s.isEmp ? (s.available ? '#06B6D4' : '#9CA3AF') : (s.available ? '#3B82F6' : '#9CA3AF'));
       const icon = L.divIcon({
         className: '',
         iconSize: [28, 28],
