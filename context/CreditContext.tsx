@@ -3,7 +3,7 @@
  * Uses zaspot.cz/api/payment/* endpoints
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { Linking, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import { apiFetch } from '../lib/api';
@@ -27,6 +27,11 @@ interface CreditContextType {
   loading: boolean;
   refreshBalance: () => Promise<void>;
   topUp: (amountCzk: number, payMethod?: 'GPAY' | 'APAY') => Promise<{ success: boolean; error?: string }>;
+  /** A browser payment was opened and hasn't been confirmed yet — UI should
+   *  show a "processing" state and block starting a second payment. */
+  paymentPending: boolean;
+  /** Manually dismiss the pending state (user aborted in the browser). */
+  clearPaymentPending: () => void;
   transactions: CreditTransaction[];
   transactionsLoading: boolean;
   refreshTransactions: () => Promise<void>;
@@ -44,6 +49,13 @@ export function CreditProvider({ children }: CreditProviderProps) {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+  const [paymentPending, setPaymentPending] = useState(false);
+  // Mirror of `balance` for use inside stable callbacks (no stale closures),
+  // plus bookkeeping for the pending-payment poll.
+  const balanceRef = useRef(0);
+  const pendingSinceRef = useRef<number | null>(null);
+  const pendingBalanceBeforeRef = useRef(0);
+  const pollTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const balanceFormatted = `${balance.toFixed(2)} CZK`;
 
@@ -61,32 +73,88 @@ export function CreditProvider({ children }: CreditProviderProps) {
   // Refresh balance whenever the app returns to the foreground. This is the
   // safety net for the iOS Safari top-up flow: after paying in Safari the user
   // may return to the app without the deep link firing — re-fetch on focus so
-  // the new balance shows up regardless.
+  // the new balance shows up regardless. While a payment is pending, a single
+  // fetch is not enough (GP callback + reconcile cron may lag) — poll with
+  // backoff until the balance moves or the attempts run out.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && isAuthenticated) {
-        fetchBalance();
+        if (pendingSinceRef.current != null) {
+          pollPendingPayment();
+        } else {
+          fetchBalance();
+        }
       }
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      clearPollTimers();
+    };
   }, [isAuthenticated]);
 
-  const fetchBalance = async () => {
+  const fetchBalance = async (): Promise<number | null> => {
     setLoading(true);
     try {
       const res = await apiFetch<{ success: boolean; balance_czk: number; user_id: string }>(
         '/payment/balance',
         { requireAuth: true }
       );
-      console.log('[CreditContext] balance response:', JSON.stringify(res.data), 'ok:', res.ok, 'status:', res.status);
       if (res.ok && res.data.success) {
-        setBalance(res.data.balance_czk || 0);
+        const value = res.data.balance_czk || 0;
+        balanceRef.current = value;
+        setBalance(value);
+        return value;
       }
+      return null;
     } catch (error) {
       console.error('Failed to fetch balance:', error);
+      return null;
     } finally {
       setLoading(false);
     }
+  };
+
+  const clearPollTimers = () => {
+    pollTimersRef.current.forEach(clearTimeout);
+    pollTimersRef.current = [];
+  };
+
+  const clearPaymentPending = useCallback(() => {
+    pendingSinceRef.current = null;
+    clearPollTimers();
+    setPaymentPending(false);
+  }, []);
+
+  // Backoff poll after returning from the external browser: the GP callback
+  // usually credits before the user switches back (first fetch hits), the
+  // reconcile cron (5 min) covers abandoned redirects — so we give up after
+  // ~90s and leave the pending banner to the manual refresh.
+  const pollPendingPayment = () => {
+    clearPollTimers();
+    const startedAt = pendingSinceRef.current;
+    const attempt = async () => {
+      // A newer payment attempt or manual dismiss invalidates this poll run.
+      if (pendingSinceRef.current !== startedAt) return false;
+      const value = await fetchBalance();
+      if (value != null && value > pendingBalanceBeforeRef.current) {
+        clearPaymentPending();
+        return true;
+      }
+      return false;
+    };
+    attempt();
+    [4000, 10000, 20000, 45000, 90000].forEach((delay) => {
+      pollTimersRef.current.push(
+        setTimeout(async () => {
+          const done = await attempt();
+          // Last scheduled attempt: stop blocking new payments even if the
+          // credit never showed up (user likely aborted in the browser).
+          if (!done && delay === 90000 && pendingSinceRef.current === startedAt) {
+            clearPaymentPending();
+          }
+        }, delay)
+      );
+    });
   };
 
   const refreshBalance = useCallback(async () => {
@@ -97,6 +165,11 @@ export function CreditProvider({ children }: CreditProviderProps) {
     amountCzk: number,
     payMethod?: 'GPAY' | 'APAY'
   ): Promise<{ success: boolean; error?: string }> => {
+    // Double-payment guard: one browser payment at a time. The button UI also
+    // disables on paymentPending, this is the belt-and-braces check.
+    if (pendingSinceRef.current != null) {
+      return { success: false, error: 'payment_pending' };
+    }
     try {
       // Hand off to the REAL external browser on BOTH platforms via Linking.openURL —
       // NOT an in-app browser / Custom Tab. When 3DS hops to another app (e.g. Revolut)
@@ -132,8 +205,11 @@ export function CreditProvider({ children }: CreditProviderProps) {
       const paymentUrl = res.ok ? (res.data.payment_url ?? res.data.paymentUrl) : undefined;
       if (res.ok && paymentUrl) {
         // Real external browser on both platforms. Resolves immediately (the browser
-        // is a separate app); the AppState foreground listener refreshes the balance
-        // when the user comes back after paying.
+        // is a separate app) — so this is NOT payment success yet. Mark the payment
+        // as pending; the AppState listener polls the balance when the user returns.
+        pendingBalanceBeforeRef.current = balanceRef.current;
+        pendingSinceRef.current = Date.now();
+        setPaymentPending(true);
         await Linking.openURL(paymentUrl);
         return { success: true };
       }
@@ -169,6 +245,8 @@ export function CreditProvider({ children }: CreditProviderProps) {
         loading,
         refreshBalance,
         topUp,
+        paymentPending,
+        clearPaymentPending,
         transactions,
         transactionsLoading,
         refreshTransactions,

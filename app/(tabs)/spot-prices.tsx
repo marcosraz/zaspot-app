@@ -302,7 +302,11 @@ export default function SpotPricesScreen() {
             </Text>
           </View>
           <Text style={[styles.currentSlot, { color: colors.textMuted }]}>
-            Slot {getCurrentSlot() + 1}/96 ({dailyData?.prices[getCurrentSlot()]?.time || '--:--'})
+            {/* dailyData.prices is HOURLY (24 entries) — getCurrentSlot() is a
+                15-min slot (0-95), so divide by 4 or every hour >= 06:00 reads
+                past the array end and shows "--:--". */}
+            Slot {Math.floor(getCurrentSlot() / 4) + 1}/24 (
+            {dailyData?.prices[Math.floor(getCurrentSlot() / 4)]?.time || '--:--'})
           </Text>
         </View>
 

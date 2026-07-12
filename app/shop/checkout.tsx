@@ -19,7 +19,7 @@ export default function CheckoutScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const { cart, total, updateQuantity, removeFromCart, clearCart } = useShop();
-  const { balance } = useCredit();
+  const { balance, refreshBalance } = useCredit();
   const { isAuthenticated } = useAuth();
   const { format } = useCurrency();
   const [address, setAddress] = useState('');
@@ -63,9 +63,20 @@ export default function CheckoutScreen() {
       // session (payment never finalizes). The external browser survives the
       // app-switch, exactly like the credit top-up flow (see CreditContext).
       await Linking.openURL(res.data.paymentUrl);
+      // Payment is NOT confirmed yet — keep the cart so an aborted/failed 3DS
+      // doesn't wipe it, and don't claim success we can't verify.
+      Alert.alert(
+        'Dokončete platbu',
+        'Platba pokračuje v prohlížeči. Po úspěšném zaplacení bude objednávka zpracována.',
+        [{ text: 'OK', onPress: () => router.replace('/shop') }]
+      );
+      return;
     }
+
+    // Wallet path: the server already debited the credit — reflect it immediately.
     clearCart();
-    Alert.alert('Hotovo', 'Objednávka byla vytvořena', [
+    refreshBalance();
+    Alert.alert('Hotovo', 'Objednávka byla vytvořena a zaplacena z peněženky', [
       { text: 'OK', onPress: () => router.replace('/shop') },
     ]);
   };

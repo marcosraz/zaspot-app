@@ -162,10 +162,21 @@ export default function StationDetailScreen() {
           const result = await stopCharging(station.chargePointId, session.transactionId);
 
           if (result.success) {
+            // `totalCostCzk` is only written at stop — the session object in hand
+            // is the still-active one, so fall back to the live values the UI
+            // already shows (last meter value / accumulated cost) instead of
+            // notifying "0.00 kWh". Cost is NET in the DB → ×1.21 like the UI.
+            const latest = getLatestMeterValue(session);
+            const energyKwh =
+              session.energyKwh ??
+              (latest?.energyWh != null
+                ? Math.max(0, (latest.energyWh - session.meterStart) / 1000)
+                : 0);
+            const costNet = session.accumulatedCostCzk ?? session.totalCostCzk;
             notifyChargingComplete(
               station.name || station.chargePointId,
-              session.energyKwh || 0,
-              session.totalCostCzk ?? undefined
+              energyKwh,
+              costNet != null ? costNet * 1.21 : undefined
             );
           } else {
             Alert.alert(l.errorStopping, result.error || l.errorStopping);

@@ -111,6 +111,9 @@ export async function fetchOcppStations(): Promise<ChargingStation[]> {
 
         return {
           id: cp.id || cp.chargePointId,
+          // OCPP identity — keys the live price lookup (/ocpp/station-prices);
+          // without it every ZAspot station shows "—" on the map.
+          external_id: cp.chargePointId,
           name: cp.name || cp.chargePointId,
           address: cp.locationAddress || '',
           city: null,

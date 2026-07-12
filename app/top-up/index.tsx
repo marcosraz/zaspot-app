@@ -43,7 +43,7 @@ type Tab = 'card' | 'transfer';
 
 export default function TopUpScreen() {
   const { colors } = useTheme();
-  const { balance, topUp, refreshBalance } = useCredit();
+  const { balance, topUp, refreshBalance, paymentPending, clearPaymentPending } = useCredit();
   const { format, currency } = useCurrency();
   const isEur = currency === 'eur';
 
@@ -102,8 +102,14 @@ export default function TopUpScreen() {
     const result = await topUp(amount, payMethod);
     setSubmitting(false);
     if (!result.success) {
-      Alert.alert('Platbu se nepodařilo zahájit', result.error || 'Zkuste to prosím znovu.');
+      const msg = result.error === 'payment_pending'
+        ? 'Předchozí platba se ještě zpracovává. Počkejte prosím, nebo ji zrušte.'
+        : result.error || 'Zkuste to prosím znovu.';
+      Alert.alert('Platbu se nepodařilo zahájit', msg);
     } else {
+      // Success = payment created (browser opened or CIT completed). The
+      // balance is refreshed by the pending-payment poll on return — for the
+      // instant CIT path topUp() already refreshed it.
       await refreshBalance();
     }
   };
@@ -206,6 +212,23 @@ export default function TopUpScreen() {
           {/* Card flow */}
           {tab === 'card' && (
             <>
+              {/* Payment in flight: GP has no server notification, so until the
+                  balance poll confirms the credit we block a second payment. */}
+              {paymentPending && (
+                <View style={[styles.pendingBanner, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B' }]}>
+                  <ActivityIndicator size="small" color="#F59E0B" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.pendingTitle, { color: colors.text }]}>Platba se zpracovává</Text>
+                    <Text style={[styles.pendingSub, { color: colors.textSecondary }]}>
+                      Dokončete platbu v prohlížeči. Kredit se připíše automaticky.
+                    </Text>
+                  </View>
+                  <TouchableOpacity onPress={clearPaymentPending} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                    <Text style={{ color: '#F59E0B', fontWeight: '600', fontSize: 13 }}>Zrušit</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
               <AmountSelector
                 presets={PRESETS}
                 selectedPreset={selectedPreset}
@@ -213,13 +236,13 @@ export default function TopUpScreen() {
                 setSelectedPreset={(p) => { setSelectedPreset(p); setCustomAmount(''); }}
                 setCustomAmount={(v) => { setCustomAmount(v); setSelectedPreset(null); }}
                 colors={colors}
-                disabled={submitting}
+                disabled={submitting || paymentPending}
               />
 
               <TouchableOpacity
                 onPress={() => handleCard()}
-                disabled={submitting || !getAmount()}
-                style={[styles.primaryBtn, { backgroundColor: Colors.brand.accentGreen, opacity: (submitting || !getAmount()) ? 0.55 : 1 }]}
+                disabled={submitting || paymentPending || !getAmount()}
+                style={[styles.primaryBtn, { backgroundColor: Colors.brand.accentGreen, opacity: (submitting || paymentPending || !getAmount()) ? 0.55 : 1 }]}
               >
                 {submitting ? <ActivityIndicator color="#fff" /> : (
                   <>
@@ -234,8 +257,8 @@ export default function TopUpScreen() {
               {/* Wallet button — Google Pay (Android) / Apple Pay (iOS), brand-black */}
               <TouchableOpacity
                 onPress={handleWallet}
-                disabled={submitting || !getAmount()}
-                style={[styles.walletBtn, { opacity: (submitting || !getAmount()) ? 0.55 : 1 }]}
+                disabled={submitting || paymentPending || !getAmount()}
+                style={[styles.walletBtn, { opacity: (submitting || paymentPending || !getAmount()) ? 0.55 : 1 }]}
               >
                 <Ionicons
                   name={walletMethod === 'APAY' ? 'logo-apple' : 'logo-google'}
@@ -481,6 +504,9 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: Layout.spacing.lg, gap: 12, paddingBottom: 40 },
   balanceCard: { padding: 20, borderRadius: 14, borderWidth: 1, alignItems: 'center' },
+  pendingBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
+  pendingTitle: { fontSize: 14, fontWeight: '700' },
+  pendingSub: { fontSize: 12, marginTop: 2 },
   balanceLabel: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
   balanceValue: { fontSize: 32, fontWeight: '700', marginTop: 6 },
 
