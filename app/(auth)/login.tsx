@@ -23,6 +23,7 @@ import {
   GoogleSignin,
   statusCodes,
 } from '@react-native-google-signin/google-signin';
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
@@ -53,13 +54,14 @@ GoogleSignin.configure({
 export default function LoginScreen() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, loginWithApple } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; general?: string }>({});
 
   const passwordRef = useRef<TextInput>(null);
@@ -122,6 +124,46 @@ export default function LoginScreen() {
     }
   };
 
+  // Sign in with Apple (iOS only) — App Store Guideline 4.8 requires it when a
+  // third-party login (Google) is offered. fullName/email are ONLY delivered on
+  // the very first authorization; the backend keys the account off the email
+  // claim inside the identity token, so later logins work without them.
+  const handleAppleLogin = async () => {
+    setErrors({});
+    setAppleLoading(true);
+    try {
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) {
+        setErrors({ general: msg.apple_signin_failed });
+        return;
+      }
+      const fullName = [credential.fullName?.givenName, credential.fullName?.familyName]
+        .filter(Boolean)
+        .join(' ') || null;
+      const r = await loginWithApple(credential.identityToken, fullName);
+      if (r.success) {
+        router.replace('/(tabs)');
+      } else {
+        setErrors({ general: msg[r.error || 'apple_signin_failed'] || msg.apple_signin_failed });
+      }
+    } catch (err: any) {
+      // User cancelled — silent, not an error
+      if (err?.code === 'ERR_REQUEST_CANCELED') return;
+      setErrors({
+        general: __DEV__
+          ? `Apple sign-in error: ${err?.code ?? ''} ${err?.message ?? ''}`.trim()
+          : msg.apple_signin_failed,
+      });
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const errorMessages: Record<string, Record<string, string>> = {
     cz: {
       invalid_credentials: 'Nesprávný e-mail nebo heslo',
@@ -132,6 +174,7 @@ export default function LoginScreen() {
       password_required: 'Zadejte heslo',
       password_short: 'Heslo musí mít alespoň 6 znaků',
       google_signin_failed: 'Přihlášení přes Google se nezdařilo. Zkuste to znovu nebo použijte e-mail.',
+      apple_signin_failed: 'Přihlášení přes Apple se nezdařilo. Zkuste to znovu nebo použijte e-mail.',
       play_services: 'Služby Google Play nejsou dostupné nebo jsou zastaralé.',
     },
     en: {
@@ -143,6 +186,7 @@ export default function LoginScreen() {
       password_required: 'Enter your password',
       password_short: 'Password must be at least 6 characters',
       google_signin_failed: 'Google sign-in failed. Try again or use email.',
+      apple_signin_failed: 'Apple sign-in failed. Try again or use email.',
       play_services: 'Google Play Services unavailable or outdated.',
     },
     de: {
@@ -154,6 +198,7 @@ export default function LoginScreen() {
       password_required: 'Passwort eingeben',
       password_short: 'Passwort muss mindestens 6 Zeichen haben',
       google_signin_failed: 'Google-Anmeldung fehlgeschlagen. Erneut versuchen oder E-Mail nutzen.',
+      apple_signin_failed: 'Apple-Anmeldung fehlgeschlagen. Erneut versuchen oder E-Mail nutzen.',
       play_services: 'Google Play Services nicht verfügbar oder veraltet.',
     },
     pl: {
@@ -165,6 +210,7 @@ export default function LoginScreen() {
       password_required: 'Podaj hasło',
       password_short: 'Hasło musi mieć co najmniej 6 znaków',
       google_signin_failed: 'Logowanie Google nie powiodło się. Spróbuj ponownie lub użyj e-maila.',
+      apple_signin_failed: 'Logowanie Apple nie powiodło się. Spróbuj ponownie lub użyj e-maila.',
       play_services: 'Usługi Google Play niedostępne lub nieaktualne.',
     },
   };
@@ -435,6 +481,29 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Sign in with Apple — iOS only. Required by App Store Guideline 4.8
+              because we offer Google login. Official Apple button component
+              (HIG-mandated look), theme-matched. */}
+          {Platform.OS === 'ios' && (
+            appleLoading ? (
+              <View style={[styles.appleButton, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator color={isDark ? '#FFFFFF' : '#000000'} size="small" />
+              </View>
+            ) : (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                buttonStyle={
+                  isDark
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={12}
+                style={styles.appleButton}
+                onPress={handleAppleLogin}
+              />
+            )
+          )}
+
           {/* Register Link */}
           <View style={styles.registerRow}>
             <Text style={[styles.registerText, { color: colors.textSecondary }]}>
@@ -583,6 +652,10 @@ const styles = StyleSheet.create({
   googleButtonText: {
     fontSize: Layout.fontSize.md,
     fontWeight: '600',
+  },
+  appleButton: {
+    height: 52,
+    marginBottom: Layout.spacing.lg,
   },
   registerRow: {
     flexDirection: 'row',

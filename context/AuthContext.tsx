@@ -15,7 +15,9 @@ import {
   apiForgotPassword,
   apiResendVerification,
   apiGoogleLogin,
-  API_BASE,
+  apiAppleLogin,
+  refreshSession,
+  setSessionExpiredListener,
 } from '../lib/api';
 
 interface AuthContextType {
@@ -24,6 +26,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: (idToken: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithApple: (identityToken: string, fullName?: string | null) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, name: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -48,71 +51,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
     loadStoredAuth();
   }, []);
 
+  // api.ts fires this when a refresh definitively fails (server 401) — the UI
+  // must drop `user`, otherwise isAuthenticated stays true while every
+  // request silently 401s until the next app restart.
+  useEffect(() => {
+    setSessionExpiredListener(() => setUser(null));
+    return () => setSessionExpiredListener(null);
+  }, []);
+
   const loadStoredAuth = async () => {
-    let authenticated = false;
     try {
       const auth = await getStoredAuth();
-      console.log('[Auth] Stored auth:', auth ? `found (${auth.user.email})` : 'none');
+      if (__DEV__) console.log('[Auth] Stored auth:', auth ? 'found' : 'none');
       if (auth) {
         setUser(auth.user);
-        authenticated = true;
         await refreshTokenSilently();
+      } else {
+        // No valid access token — a refresh token may still revive the session
+        // (access token expired while the app was closed).
+        const result = await refreshSession();
+        if (result === 'ok') {
+          const revived = await getStoredAuth();
+          if (revived) setUser(revived.user);
+        }
       }
     } catch (error) {
-      console.error('[Auth] Failed to load auth:', error);
+      if (__DEV__) console.error('[Auth] Failed to load auth:', error);
     } finally {
-      console.log('[Auth] Loading complete, had stored auth:', authenticated);
       setIsLoading(false);
     }
   };
 
+  // Central refresh via api.ts (shared mutex with apiFetch's 401 retry — no
+  // more parallel refresh race). Network failures keep the session: the
+  // stored token may still be perfectly valid, we just couldn't rotate it.
   const refreshTokenSilently = async () => {
-    try {
-      // Get stored token directly
+    const result = await refreshSession();
+    if (__DEV__) console.log('[Auth] Silent refresh:', result);
+    if (result === 'ok') {
       const auth = await getStoredAuth();
-      if (!auth) {
-        console.log('[Auth] No stored token for refresh');
-        setUser(null);
-        return;
-      }
-
-      // Use raw fetch to avoid apiFetch's built-in 401→refresh retry loop
-      // (apiFetch would call refreshToken() internally on 401, creating a circular call)
-      console.log('[Auth] Refreshing token...');
-      const res = await fetch(`${API_BASE}/auth/mobile-refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${auth.token}`,
-        },
-      });
-
-      console.log('[Auth] Refresh response status:', res.status);
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.token) {
-          await storeAuth({
-            token: data.token,
-            user: data.user,
-            expiresAt: data.expiresAt,
-          });
-          setUser(data.user);
-          console.log('[Auth] Token refreshed successfully');
-          return;
-        }
-      }
-
-      // Refresh failed - token is invalid, user needs to log in again
-      const errorText = await res.text().catch(() => 'unknown');
-      console.log('[Auth] Token refresh failed:', res.status, errorText);
-      await clearStoredAuth();
-      setUser(null);
-    } catch (error) {
-      console.log('[Auth] Token refresh error:', error);
-      await clearStoredAuth();
+      if (auth) setUser(auth.user);
+    } else if (result === 'expired') {
       setUser(null);
     }
+    // 'network' → keep current user; next apiFetch retries the refresh
   };
 
   const login = useCallback(async (email: string, password: string) => {
@@ -124,6 +106,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           token: res.data.token,
           user: res.data.user,
           expiresAt: res.data.expiresAt,
+          refreshToken: res.data.refreshToken,
         });
         setUser(res.data.user);
         return { success: true };
@@ -151,12 +134,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
           token: res.data.token,
           user: res.data.user,
           expiresAt: res.data.expiresAt,
+          refreshToken: res.data.refreshToken,
         });
         setUser(res.data.user);
         return { success: true };
       }
       const errorData = res.data as any;
       return { success: false, error: errorData?.error || 'google_login_failed' };
+    } catch {
+      return { success: false, error: 'network_error' };
+    }
+  }, []);
+
+  const loginWithApple = useCallback(async (identityToken: string, fullName?: string | null) => {
+    try {
+      const res = await apiAppleLogin(identityToken, fullName);
+      if (res.ok) {
+        await storeAuth({
+          token: res.data.token,
+          user: res.data.user,
+          expiresAt: res.data.expiresAt,
+          refreshToken: res.data.refreshToken,
+        });
+        setUser(res.data.user);
+        return { success: true };
+      }
+      const errorData = res.data as any;
+      return { success: false, error: errorData?.error || 'apple_login_failed' };
     } catch {
       return { success: false, error: 'network_error' };
     }
@@ -219,6 +223,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         isLoading,
         login,
         loginWithGoogle,
+        loginWithApple,
         register,
         logout,
         forgotPassword,

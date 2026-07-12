@@ -18,6 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'cz.zaspot.app',
+    usesAppleSignIn: true,
     buildNumber: '104',
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
@@ -71,6 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-web-browser',
     '@react-native-google-signin/google-signin',
+    'expo-apple-authentication',
     [
       // AppCheckCore (via GoogleSignIn SDK) is a Swift pod that imports
       // GoogleUtilities + RecaptchaInterop — those need modular headers when
