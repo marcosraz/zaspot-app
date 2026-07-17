@@ -2,7 +2,7 @@
  * Route Planner Screen - Plan trips with real charging stops from Supabase
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -101,14 +101,19 @@ export default function RouteScreen() {
     }
   };
 
-  // Geocode destination when user finishes typing
+  // Geocode destination when user finishes typing. Guarded against the
+  // edit-during-geocode race: if the user changed the text while the request
+  // was in flight, the (now stale) result must not overwrite the coords.
+  const toQueryRef = useRef('');
   const handleToLocationBlur = async () => {
     if (!toLocation.trim()) return;
 
-    const coords = await geocodeLocation(toLocation);
-    if (coords) {
+    const query = toLocation;
+    toQueryRef.current = query;
+    const coords = await geocodeLocation(query);
+    if (coords && toQueryRef.current === query) {
       setToCoords(coords);
-      setToLocation(coords.name || toLocation);
+      setToLocation(coords.name || query);
     }
   };
 
@@ -211,7 +216,13 @@ export default function RouteScreen() {
               placeholder={t.route.from}
               placeholderTextColor={colors.textMuted}
               value={fromLocation}
-              onChangeText={setFromLocation}
+              onChangeText={(v) => {
+                setFromLocation(v);
+                // Invalidate stale coords — calculateRoute only re-geocodes
+                // when coords are null, so editing the text MUST clear them
+                // (otherwise the route goes to the previous destination).
+                setFromCoords(null);
+              }}
             />
             <TouchableOpacity
               style={styles.locationBtn}
@@ -241,7 +252,11 @@ export default function RouteScreen() {
               placeholder={t.route.to}
               placeholderTextColor={colors.textMuted}
               value={toLocation}
-              onChangeText={setToLocation}
+              onChangeText={(v) => {
+                setToLocation(v);
+                setToCoords(null); // see fromLocation — stale coords = wrong route
+                toQueryRef.current = v; // invalidates in-flight blur geocode
+              }}
               onBlur={handleToLocationBlur}
             />
           </View>

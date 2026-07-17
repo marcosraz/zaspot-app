@@ -264,6 +264,9 @@ export interface Translations {
     duration: string;
     energy: string;
     avgPrice: string;
+    subtotalNet: string;
+    vat: string;
+    totalGross: string;
     total: string;
     status: string;
     completed: string;
@@ -328,6 +331,8 @@ export interface Translations {
     reserveSuccess: string;
     reserveError: string;
     reserving: string;
+    newVehicleDetected: string;
+    autoChargeAdded: string;
   };
 
   // Common
@@ -692,6 +697,9 @@ export const translations: Record<Language, Translations> = {
       duration: 'Doba nabíjení',
       energy: 'Energie',
       avgPrice: 'Průměrná cena',
+      subtotalNet: 'Cena bez DPH',
+      vat: 'DPH 21 %',
+      totalGross: 'Celkem s DPH',
       total: 'Celkem',
       status: 'Stav',
       completed: 'Dokončeno',
@@ -754,6 +762,8 @@ export const translations: Record<Language, Translations> = {
       reserveSuccess: 'Rezervace vytvořena',
       reserveError: 'Chyba při rezervaci',
       reserving: 'Rezervuji...',
+      newVehicleDetected: 'U této stanice bylo rozpoznáno nové vozidlo. Přidejte ho do AutoCharge — příště se nabíjení spustí automaticky po připojení kabelu.',
+      autoChargeAdded: 'Vozidlo přidáno do AutoCharge. Příště se nabíjení spustí automaticky.',
     },
     common: {
       loading: 'Načítání...',
@@ -1101,6 +1111,9 @@ export const translations: Record<Language, Translations> = {
       duration: 'Charging duration',
       energy: 'Energy',
       avgPrice: 'Average price',
+      subtotalNet: 'Price excl. VAT',
+      vat: 'VAT 21%',
+      totalGross: 'Total incl. VAT',
       total: 'Total',
       status: 'Status',
       completed: 'Completed',
@@ -1163,6 +1176,8 @@ export const translations: Record<Language, Translations> = {
       reserveSuccess: 'Reservation created',
       reserveError: 'Reservation error',
       reserving: 'Reserving...',
+      newVehicleDetected: 'A new vehicle was detected at this station. Add it to AutoCharge — next time charging starts automatically when you plug in.',
+      autoChargeAdded: 'Vehicle added to AutoCharge. Charging will start automatically next time.',
     },
     common: {
       loading: 'Loading...',
@@ -1510,6 +1525,9 @@ export const translations: Record<Language, Translations> = {
       duration: 'Ladedauer',
       energy: 'Energie',
       avgPrice: 'Durchschnittspreis',
+      subtotalNet: 'Preis ohne MwSt.',
+      vat: 'MwSt. 21 %',
+      totalGross: 'Gesamt inkl. MwSt.',
       total: 'Gesamt',
       status: 'Status',
       completed: 'Abgeschlossen',
@@ -1572,6 +1590,8 @@ export const translations: Record<Language, Translations> = {
       reserveSuccess: 'Reservierung erstellt',
       reserveError: 'Reservierungsfehler',
       reserving: 'Reserviere...',
+      newVehicleDetected: 'An dieser Station wurde ein neues Fahrzeug erkannt. Zu AutoCharge hinzufügen — beim nächsten Anstecken startet das Laden automatisch.',
+      autoChargeAdded: 'Fahrzeug zu AutoCharge hinzugefügt. Das Laden startet beim nächsten Mal automatisch.',
     },
     common: {
       loading: 'Lädt...',
@@ -1919,6 +1939,9 @@ export const translations: Record<Language, Translations> = {
       duration: 'Czas ładowania',
       energy: 'Energia',
       avgPrice: 'Średnia cena',
+      subtotalNet: 'Cena bez VAT',
+      vat: 'VAT 21%',
+      totalGross: 'Razem z VAT',
       total: 'Łącznie',
       status: 'Status',
       completed: 'Zakończone',
@@ -1981,6 +2004,8 @@ export const translations: Record<Language, Translations> = {
       reserveSuccess: 'Rezerwacja utworzona',
       reserveError: 'Błąd rezerwacji',
       reserving: 'Rezerwuję...',
+      newVehicleDetected: 'Na tej stacji wykryto nowy pojazd. Dodaj go do AutoCharge — następnym razem ładowanie rozpocznie się automatycznie po podłączeniu.',
+      autoChargeAdded: 'Pojazd dodany do AutoCharge. Następnym razem ładowanie rozpocznie się automatycznie.',
     },
     common: {
       loading: 'Ładowanie...',

@@ -15,6 +15,7 @@ import {
   Linking,
   Platform,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -47,6 +48,7 @@ import {
   StationTariffPrices,
 } from '../../../lib/pricing';
 import { useFocusedInterval } from '../../../hooks/useFocusedInterval';
+import { PendingVehicle, fetchPendingVehicles, registerVehicle } from '../../../lib/vehicles';
 import { createReservation } from '../../../lib/reservations';
 import { openNavigationTo } from '../../../lib/navigation';
 
@@ -72,6 +74,12 @@ export default function StationDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null); // 'start-N' or 'stop-N'
+  // AutoCharge discovery: cars announce their MAC (Authorize VID:) when plugged
+  // in — offer one-tap registration right here at the station, during or after
+  // charging, instead of burying it in the profile's AutoCharge section.
+  const [pendingHere, setPendingHere] = useState<PendingVehicle[]>([]);
+  const [vehicleName, setVehicleName] = useState('');
+  const [registeringMac, setRegisteringMac] = useState<string | null>(null);
 
   // ─── Data Fetching ─────────────────────────────
 
@@ -110,6 +118,34 @@ export default function StationDetailScreen() {
   // requests per tick; before this gating it kept running when the user
   // navigated away (stack screens stay mounted) or backgrounded the app.
   useFocusedInterval(() => loadStation(false), 5000);
+
+  // Poll pending AutoCharge vehicles seen at THIS station (30-min window,
+  // matches the web charge page). Slower cadence — plug-in events are rare.
+  const loadPendingVehicles = useCallback(async () => {
+    if (!isAuthenticated || !station?.chargePointId) return;
+    const pending = await fetchPendingVehicles();
+    setPendingHere(pending.filter((v) => v.last_charge_point_id === station.chargePointId));
+  }, [isAuthenticated, station?.chargePointId]);
+
+  useEffect(() => {
+    loadPendingVehicles();
+  }, [loadPendingVehicles]);
+
+  useFocusedInterval(loadPendingVehicles, 15000, { enabled: isAuthenticated });
+
+  const handleRegisterAutoCharge = async (mac: string) => {
+    if (!vehicleName.trim()) return;
+    setRegisteringMac(mac);
+    const result = await registerVehicle(mac, vehicleName.trim());
+    setRegisteringMac(null);
+    if (result.success) {
+      setVehicleName('');
+      setPendingHere((prev) => prev.filter((v) => v.id_tag !== mac));
+      Alert.alert('AutoCharge ✓', l.autoChargeAdded);
+    } else {
+      Alert.alert(l.error, result.error || l.error);
+    }
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -426,6 +462,54 @@ export default function StationDetailScreen() {
             )}
           </View>
         )}
+
+        {/* AutoCharge: newly detected vehicle at this station — one-tap registration */}
+        {pendingHere.map((v) => (
+          <View
+            key={v.id_tag}
+            style={[styles.autoChargeCard, { backgroundColor: colors.surface, borderColor: Colors.brand.accentGreen }]}
+          >
+            <View style={styles.autoChargeHeader}>
+              <View style={[styles.autoChargeBadge, { backgroundColor: Colors.brand.accentGreen + '20' }]}>
+                <Ionicons name="car-sport" size={20} color={Colors.brand.accentGreen} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.autoChargeTitle, { color: colors.text }]}>
+                  {t.profile.newVehicle}
+                </Text>
+                <Text style={[styles.autoChargeMac, { color: colors.textMuted }]}>
+                  {v.id_tag}
+                </Text>
+              </View>
+            </View>
+            <Text style={[styles.autoChargeHint, { color: colors.textSecondary }]}>
+              {l.newVehicleDetected}
+            </Text>
+            <View style={styles.autoChargeForm}>
+              <TextInput
+                value={vehicleName}
+                onChangeText={setVehicleName}
+                placeholder={t.profile.vehicleNamePlaceholder}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.autoChargeInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }]}
+              />
+              <TouchableOpacity
+                onPress={() => handleRegisterAutoCharge(v.id_tag)}
+                disabled={registeringMac !== null || !vehicleName.trim()}
+                style={[
+                  styles.autoChargeBtn,
+                  { backgroundColor: Colors.brand.accentGreen, opacity: registeringMac !== null || !vehicleName.trim() ? 0.55 : 1 },
+                ]}
+              >
+                {registeringMac === v.id_tag ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.autoChargeBtnText}>{t.profile.addVehicle}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
 
         {/* Connectors */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
@@ -781,6 +865,62 @@ const styles = StyleSheet.create({
   },
   spotPriceLabel: {
     fontSize: Layout.fontSize.xs,
+  },
+
+  // AutoCharge discovery card
+  autoChargeCard: {
+    borderRadius: Layout.borderRadius.xl,
+    borderWidth: 1.5,
+    padding: Layout.spacing.md,
+    marginBottom: Layout.spacing.md,
+    gap: Layout.spacing.sm,
+  },
+  autoChargeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Layout.spacing.md,
+  },
+  autoChargeBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoChargeTitle: {
+    fontSize: Layout.fontSize.md,
+    fontWeight: '700',
+  },
+  autoChargeMac: {
+    fontSize: Layout.fontSize.xs,
+    marginTop: 2,
+  },
+  autoChargeHint: {
+    fontSize: Layout.fontSize.sm,
+    lineHeight: 19,
+  },
+  autoChargeForm: {
+    flexDirection: 'row',
+    gap: Layout.spacing.sm,
+  },
+  autoChargeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: Layout.borderRadius.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: Layout.fontSize.sm,
+  },
+  autoChargeBtn: {
+    paddingHorizontal: 18,
+    borderRadius: Layout.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoChargeBtnText: {
+    color: '#FFFFFF',
+    fontSize: Layout.fontSize.sm,
+    fontWeight: '700',
   },
 
   // Section

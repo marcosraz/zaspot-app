@@ -143,7 +143,9 @@ export default function ReceiptScreen() {
     <div class="row"><span class="label">${l.duration || 'Duration'}</span><span class="val">${formatDuration(r.durationMinutes)}</span></div>
     <div class="row"><span class="label">${l.energy}</span><span class="val">${formatEnergy(r.energyKwh)} kWh</span></div>
     ${r.avgSpotPriceCzkKwh ? `<div class="row"><span class="label">${(l as any).avgPrice || 'Avg. price'}</span><span class="val">${format(r.avgSpotPriceCzkKwh, { perKwh: true })}</span></div>` : ''}
-    <div class="row"><span class="label">${l.total}</span><span class="val total">${format((r.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}</span></div>
+    <div class="row"><span class="label">${l.subtotalNet}</span><span class="val">${format(r.totalCostCzk ?? 0, { decimals: 2 })}</span></div>
+    <div class="row"><span class="label">${l.vat}</span><span class="val">${format((r.totalCostCzk ?? 0) * 0.21, { decimals: 2 })}</span></div>
+    <div class="row"><span class="label">${l.totalGross}</span><span class="val total">${format((r.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}</span></div>
     ${r.userName ? `<div class="row"><span class="label">${(l as any).customer || 'Customer'}</span><span class="val">${r.userName}</span></div>` : ''}
   </div>
 
@@ -383,11 +385,24 @@ export default function ReceiptScreen() {
             </View>
           )}
 
-          {/* Total — shown GROSS (incl. 21% DPH) to match the wallet deduction.
-              total_cost_czk is stored NET in the DB; every user-facing surface
-              (wallet, web receipt, my-charges) displays × 1.21. */}
+          {/* VAT breakdown — total_cost_czk is stored NET in the DB. The receipt
+              must show net / VAT / gross separately so business customers can
+              reclaim the DPH (nárokovat si DPH). Gross matches the wallet
+              deduction (× 1.21). */}
+          <View style={[styles.vatRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.vatLabel, { color: colors.textSecondary }]}>{l.subtotalNet}</Text>
+            <Text style={[styles.vatValue, { color: colors.text }]}>
+              {format(receipt.totalCostCzk ?? 0, { decimals: 2 })}
+            </Text>
+          </View>
+          <View style={styles.vatRowPlain}>
+            <Text style={[styles.vatLabel, { color: colors.textSecondary }]}>{l.vat}</Text>
+            <Text style={[styles.vatValue, { color: colors.text }]}>
+              {format((receipt.totalCostCzk ?? 0) * 0.21, { decimals: 2 })}
+            </Text>
+          </View>
           <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-            <Text style={[styles.totalLabel, { color: colors.text }]}>{l.total}</Text>
+            <Text style={[styles.totalLabel, { color: colors.text }]}>{l.totalGross}</Text>
             <Text style={[styles.totalValue, { color: Colors.brand.accentGreen }]}>
               {format((receipt.totalCostCzk ?? 0) * 1.21, { decimals: 2 })}
             </Text>
@@ -528,6 +543,27 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: Layout.fontSize.sm,
+    fontWeight: '600',
+  },
+  vatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Layout.spacing.md,
+    paddingTop: Layout.spacing.md,
+    borderTopWidth: 1,
+  },
+  vatRowPlain: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Layout.spacing.sm,
+  },
+  vatLabel: {
+    fontSize: Layout.fontSize.sm,
+  },
+  vatValue: {
+    fontSize: Layout.fontSize.md,
     fontWeight: '600',
   },
   totalRow: {
