@@ -2,7 +2,7 @@
  * Community Energy — Member Dashboard
  */
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
@@ -164,9 +164,30 @@ export default function CommunityScreen() {
                 </Text>
               </View>
 
+              {/* How it works — the bare "no communities" line explained nothing
+                  and offered no way to register interest. */}
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
+                <Text style={[styles.howItWorks, { color: colors.textSecondary }]}>
+                  {t.community.howItWorks}
+                </Text>
+              </View>
+
               <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t.community.availableCommunities}</Text>
               {available.length === 0 ? (
-                <Text style={{ color: colors.textMuted, padding: 14 }}>{t.community.noCommunities}</Text>
+                <>
+                  <Text style={{ color: colors.textMuted, padding: 14 }}>{t.community.noCommunities}</Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      Linking.openURL(
+                        `mailto:info@zaspot.cz?subject=${encodeURIComponent(t.community.interestedSubject)}&body=${encodeURIComponent((user?.email ?? '') + '\n')}`
+                      )
+                    }
+                    style={[styles.interestBtn, { backgroundColor: Colors.brand.accentGreen }]}
+                  >
+                    <Ionicons name="mail" size={18} color="#fff" />
+                    <Text style={styles.interestBtnText}>{t.community.interestedCta}</Text>
+                  </TouchableOpacity>
+                </>
               ) : (
                 available.map((c) => (
                   <TouchableOpacity key={c.id} onPress={() => apply(c)}>
@@ -221,4 +242,7 @@ const styles = StyleSheet.create({
   communityCard: { padding: 14, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center' },
   communityName: { fontSize: 15, fontWeight: '600' },
   communityMeta: { fontSize: 12, marginTop: 2 },
+  howItWorks: { fontSize: 13, lineHeight: 20 },
+  interestBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 12, marginTop: 4 },
+  interestBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });

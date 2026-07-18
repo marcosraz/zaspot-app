@@ -46,6 +46,9 @@ export interface RouteResult {
   chargingDuration: number;   // minutes
   totalCost: number;          // CZK
   stops: ChargingStop[];
+  /** True when the charging network has a gap on this corridor — the plan
+   *  could not cover the whole distance and must not be trusted blindly. */
+  incomplete?: boolean;
 }
 
 // Constants for route calculation
@@ -176,9 +179,14 @@ export async function planRoute(
     const east = Math.max(from.longitude, to.longitude) + pad;
     const south = Math.min(from.latitude, to.latitude) - pad;
     const north = Math.max(from.latitude, to.latitude) + pad;
+    // Grouped + limit 2500: the raw per-EVSE mode capped at 1000 rows cut
+    // ALPHABETICALLY across the whole box — on long routes (Brno→Barcelona
+    // spans 14° of longitude) that left near-random coverage. Grouping gives
+    // one row per site, so 2500 covers the corridor far better.
     const empRes = await fetchEmpStations({
       bounds: `${west},${south},${east},${north}`,
-      limit: 1000,
+      limit: 2500,
+      groupByLocation: true,
     }).catch(() => null);
     if (empRes?.ok && empRes.data?.success) {
       const seen = new Set(allStations.map((s) => s.id));
@@ -266,8 +274,10 @@ export async function planRoute(
 
   // Plan stops
   let distanceTraveled = 0;
+  let routeIncomplete = false;
+  const MAX_STOPS = 20; // hard cap against pathological loops
 
-  while (remainingDistance > 0) {
+  while (remainingDistance > 0 && stops.length < MAX_STOPS) {
     // Calculate how far we can go with current battery
     const rangeWithCurrentBattery = (currentBattery - MIN_BATTERY_PERCENT) / 100 * vehicleRangeKm;
 
@@ -276,7 +286,16 @@ export async function planRoute(
       break;
     }
 
-    // Find best charging station within our range
+    // Find the best charging station within range that makes real PROGRESS
+    // toward the destination. The old filter had no direction requirement, so
+    // a well-scored station BEHIND the car (e.g. Zlín on a Brno→Barcelona
+    // route) could be picked; its second condition (distToStation >
+    // distanceTraveled) was meaningless. Require each stop to cut the
+    // remaining distance by at least 10 km.
+    const currentDistToGoal = calculateDistance(
+      currentPosition.latitude, currentPosition.longitude,
+      to.latitude, to.longitude
+    );
     const reachableStations = stationsAlongRoute.filter(station => {
       const distToStation = calculateDistance(
         currentPosition.latitude,
@@ -284,11 +303,18 @@ export async function planRoute(
         station.latitude,
         station.longitude
       );
-      return distToStation < rangeWithCurrentBattery && distToStation > distanceTraveled;
+      if (distToStation <= 0.5 || distToStation >= rangeWithCurrentBattery) return false;
+      const stationDistToGoal = calculateDistance(
+        station.latitude, station.longitude,
+        to.latitude, to.longitude
+      );
+      return stationDistToGoal < currentDistToGoal - 10;
     });
 
     if (reachableStations.length === 0) {
-      // No reachable stations - this route may not be possible
+      // No reachable stations — the network has a gap on this corridor.
+      // Surface it instead of silently returning a truncated plan.
+      routeIncomplete = true;
       console.warn('No reachable stations found for route');
       break;
     }
@@ -366,7 +392,20 @@ export async function planRoute(
     };
     currentBattery = arrivalBattery + chargeAmount;
     distanceTraveled += distToStation;
-    remainingDistance = totalDistance - distanceTraveled;
+    // Remaining distance from the ACTUAL current position — the old
+    // totalDistance − distanceTraveled went negative on detours and
+    // terminated the loop while still hundreds of km from the goal.
+    remainingDistance = calculateDistance(
+      currentPosition.latitude, currentPosition.longitude,
+      to.latitude, to.longitude
+    );
+  }
+
+  // MAX_STOPS exit while the remaining leg still exceeds the battery → the
+  // plan is incomplete too.
+  const finalRange = (currentBattery - MIN_BATTERY_PERCENT) / 100 * vehicleRangeKm;
+  if (stops.length >= MAX_STOPS && finalRange < remainingDistance) {
+    routeIncomplete = true;
   }
 
   const drivingDuration = calculateDrivingTime(totalDistance);
@@ -380,6 +419,7 @@ export async function planRoute(
     chargingDuration: Math.round(totalChargingTime),
     totalCost: Math.round(totalChargingCost),
     stops,
+    incomplete: routeIncomplete,
   };
 }
 
@@ -387,26 +427,29 @@ export async function planRoute(
  * Geocode a location name to coordinates (simplified - uses Nominatim)
  */
 export async function geocodeLocation(query: string): Promise<RoutePoint | null> {
-  try {
-    const encodedQuery = encodeURIComponent(query + ', Czech Republic');
+  const search = async (q: string): Promise<any | null> => {
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodedQuery}&format=json&limit=1`,
-      {
-        headers: {
-          'User-Agent': 'ZAspot Mobile App',
-        },
-      }
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=1&accept-language=cs`,
+      { headers: { 'User-Agent': 'ZAspot Mobile App' } }
     );
-
     if (!response.ok) return null;
-
     const data = await response.json();
-    if (data.length === 0) return null;
+    return data.length > 0 ? data[0] : null;
+  };
+
+  try {
+    // Plain query first — the old hardcoded ", Czech Republic" suffix broke
+    // international destinations ("Barcelona, Czech Republic" happened to hit
+    // the Czech honorary consulate there). Nominatim's importance ranking
+    // resolves bare CZ city names fine; only when nothing matches at all do
+    // we retry with a Czech bias (typos, tiny villages).
+    const hit = (await search(query)) ?? (await search(query + ', Česko'));
+    if (!hit) return null;
 
     return {
-      latitude: parseFloat(data[0].lat),
-      longitude: parseFloat(data[0].lon),
-      name: data[0].display_name.split(',')[0],
+      latitude: parseFloat(hit.lat),
+      longitude: parseFloat(hit.lon),
+      name: hit.display_name.split(',')[0],
     };
   } catch (error) {
     console.error('Geocoding error:', error);

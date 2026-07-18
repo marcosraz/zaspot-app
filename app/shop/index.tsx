@@ -11,7 +11,7 @@ import { useShop } from '../../context/ShopContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
-import { fetchProducts, ShopProduct } from '../../lib/v2Features';
+import { fetchProducts, ShopProduct, absoluteAssetUrl } from '../../lib/v2Features';
 
 export default function ShopScreen() {
   const { colors } = useTheme();
@@ -81,7 +81,7 @@ export default function ShopScreen() {
               style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
             >
               {p.image_url ? (
-                <Image source={{ uri: p.image_url }} style={styles.image} resizeMode="cover" />
+                <Image source={{ uri: absoluteAssetUrl(p.image_url)! }} style={styles.image} resizeMode="cover" />
               ) : (
                 <View style={[styles.image, { backgroundColor: colors.surfaceSecondary }]} />
               )}

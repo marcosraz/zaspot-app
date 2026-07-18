@@ -438,6 +438,17 @@ export default function RouteScreen() {
         {/* Route Result */}
         {routeResult && (
           <>
+            {/* Network-gap warning — better an honest caveat than a silently
+                truncated plan (Brno→Barcelona used to end at the last CZ stop) */}
+            {routeResult.incomplete && (
+              <View style={[styles.incompleteBanner, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B' }]}>
+                <Ionicons name="warning" size={20} color="#F59E0B" />
+                <Text style={[styles.incompleteText, { color: colors.text }]}>
+                  {t.route.routeIncomplete}
+                </Text>
+              </View>
+            )}
+
             {/* Summary Card */}
             <View style={[styles.summaryCard, { backgroundColor: colors.surface }]}>
               <View style={styles.summaryRow}>
@@ -742,6 +753,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: Layout.fontSize.md,
     fontWeight: '600',
+  },
+  incompleteBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  incompleteText: {
+    flex: 1,
+    fontSize: 13,
+    lineHeight: 18,
   },
   summaryCard: {
     borderRadius: Layout.borderRadius.xl,

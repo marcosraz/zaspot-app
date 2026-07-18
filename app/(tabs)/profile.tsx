@@ -1010,12 +1010,14 @@ export default function ProfileScreen() {
               icon="help-circle"
               label={t.profile.help}
               iconColor="#10B981"
+              onPress={() => Linking.openURL('https://www.zaspot.cz/cs/faq')}
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <MenuItem
               icon="information-circle"
               label={t.profile.about}
               iconColor="#6366F1"
+              onPress={() => router.push('/about')}
             />
           </View>
         </View>

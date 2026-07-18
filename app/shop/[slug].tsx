@@ -11,7 +11,7 @@ import { useShop } from '../../context/ShopContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
-import { fetchProduct, ShopProduct } from '../../lib/v2Features';
+import { fetchProduct, ShopProduct, absoluteAssetUrl } from '../../lib/v2Features';
 
 export default function ProductDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -56,7 +56,7 @@ export default function ProductDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView contentContainerStyle={styles.content}>
           {product.image_url && (
-            <Image source={{ uri: product.image_url }} style={styles.image} resizeMode="cover" />
+            <Image source={{ uri: absoluteAssetUrl(product.image_url)! }} style={styles.image} resizeMode="cover" />
           )}
           <Text style={[styles.name, { color: colors.text }]}>{product.name}</Text>
           <Text style={[styles.price, { color: Colors.brand.accentGreen }]}>{format(product.price_czk, { decimals: 0 })}</Text>

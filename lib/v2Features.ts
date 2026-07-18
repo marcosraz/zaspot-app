@@ -149,6 +149,15 @@ export interface ShopOrder {
   }>;
 }
 
+/**
+ * The shop API returns web-relative image paths ("/images/products/…") —
+ * fine in the Next.js frontend, but RN's <Image> needs an absolute URL.
+ */
+export function absoluteAssetUrl(path: string | null): string | null {
+  if (!path) return null;
+  return path.startsWith('http') ? path : `https://www.zaspot.cz${path}`;
+}
+
 export async function fetchProducts() {
   // Public listing — no auth required
   return apiFetch<{ success: boolean; products: ShopProduct[] }>('/shop');

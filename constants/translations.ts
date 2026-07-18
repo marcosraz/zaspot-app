@@ -122,6 +122,7 @@ export interface Translations {
     estimatedPrice: string;
     emptyStateTitle: string;
     emptyStateDesc: string;
+    routeIncomplete: string;
   };
 
   // Profile screen
@@ -394,6 +395,9 @@ export interface Translations {
     infoText: string;
     availableCommunities: string;
     noCommunities: string;
+    howItWorks: string;
+    interestedCta: string;
+    interestedSubject: string;
     loginTitle: string;
     loginMessage: string;
     applySentTitle: string;
@@ -432,6 +436,13 @@ export interface Translations {
     deleteTitle: string;
     delete: string;
     noTags: string;
+  };
+
+  // About screen
+  about: {
+    legal: string;
+    privacy: string;
+    website: string;
   };
 
   // Wallet transaction history
@@ -563,6 +574,7 @@ export const translations: Record<Language, Translations> = {
       estimatedPrice: 'Odhadovaná cena',
       emptyStateTitle: 'Naplánujte si cestu',
       emptyStateDesc: 'Zadejte odkud a kam jedete, a najdeme vám optimální nabíjecí zastávky ze sítě ZAspot',
+      routeIncomplete: 'Pozor: na části trasy nejsou v naší síti nabíjecí stanice. Trasa může být neúplná — zkontrolujte pokrytí v cílové oblasti.',
     },
     profile: {
       title: 'Profil',
@@ -817,6 +829,9 @@ export const translations: Record<Language, Translations> = {
       infoText: 'Komunitní energetika umožňuje sdílet vyrobenou energii mezi členy komunity a šetřit za elektřinu.',
       availableCommunities: 'Dostupné komunity',
       noCommunities: 'Žádné aktivní komunity',
+      howItWorks: 'Jak to funguje: Výrobci (např. s fotovoltaikou) sdílejí přebytky energie se spotřebiteli v komunitě přes distribuční síť (EDC). Spotřebitelé platí za sdílenou energii méně než u dodavatele, výrobci dostanou za přebytky více než při prodeji do sítě. ZAspot se stará o registraci u EDC, měření a měsíční vyúčtování.',
+      interestedCta: 'Mám zájem o komunitní energetiku',
+      interestedSubject: 'Zájem o komunitní energetiku',
       loginTitle: 'Přihlášení',
       loginMessage: 'Pro vstup do komunity se nejprve přihlaste.',
       applySentTitle: 'Žádost odeslána',
@@ -851,6 +866,11 @@ export const translations: Record<Language, Translations> = {
       deleteTitle: 'Smazat RFID tag?',
       delete: 'Smazat',
       noTags: 'Žádné RFID karty',
+    },
+    about: {
+      legal: 'Právní informace',
+      privacy: 'Ochrana osobních údajů',
+      website: 'Webové stránky',
     },
     walletHistory: {
       title: 'Historie peněženky',
@@ -977,6 +997,7 @@ export const translations: Record<Language, Translations> = {
       estimatedPrice: 'Estimated price',
       emptyStateTitle: 'Plan your trip',
       emptyStateDesc: 'Enter your start and destination, and we\'ll find optimal charging stops from the ZAspot network',
+      routeIncomplete: 'Warning: parts of this route have no charging stations in our network. The plan may be incomplete — check coverage near your destination.',
     },
     profile: {
       title: 'Profile',
@@ -1231,6 +1252,9 @@ export const translations: Record<Language, Translations> = {
       infoText: 'Community energy lets you share generated electricity between members and save on your bills.',
       availableCommunities: 'Available communities',
       noCommunities: 'No active communities',
+      howItWorks: 'How it works: producers (e.g. with solar PV) share surplus energy with consumers in the community via the grid (EDC). Consumers pay less than at their supplier, producers earn more than by selling to the grid. ZAspot handles EDC registration, metering and monthly billing.',
+      interestedCta: 'I am interested in community energy',
+      interestedSubject: 'Interest in community energy',
       loginTitle: 'Sign in',
       loginMessage: 'Please sign in first to join a community.',
       applySentTitle: 'Application sent',
@@ -1265,6 +1289,11 @@ export const translations: Record<Language, Translations> = {
       deleteTitle: 'Delete RFID tag?',
       delete: 'Delete',
       noTags: 'No RFID cards',
+    },
+    about: {
+      legal: 'Legal information',
+      privacy: 'Privacy policy',
+      website: 'Website',
     },
     walletHistory: {
       title: 'Wallet History',
@@ -1391,6 +1420,7 @@ export const translations: Record<Language, Translations> = {
       estimatedPrice: 'Geschätzte Kosten',
       emptyStateTitle: 'Planen Sie Ihre Reise',
       emptyStateDesc: 'Geben Sie Start und Ziel ein, und wir finden optimale Ladestopps im ZAspot-Netzwerk',
+      routeIncomplete: 'Achtung: Auf Teilen der Route gibt es keine Ladestationen in unserem Netz. Der Plan kann unvollständig sein — Abdeckung am Ziel prüfen.',
     },
     profile: {
       title: 'Profil',
@@ -1645,6 +1675,9 @@ export const translations: Record<Language, Translations> = {
       infoText: 'Gemeinschaftsenergie ermöglicht es, erzeugten Strom zwischen Mitgliedern zu teilen und bei der Stromrechnung zu sparen.',
       availableCommunities: 'Verfügbare Gemeinschaften',
       noCommunities: 'Keine aktiven Gemeinschaften',
+      howItWorks: 'So funktioniert es: Erzeuger (z. B. mit Photovoltaik) teilen Überschüsse über das Verteilnetz (EDC) mit Verbrauchern der Gemeinschaft. Verbraucher zahlen weniger als beim Versorger, Erzeuger bekommen mehr als bei der Netzeinspeisung. ZAspot übernimmt EDC-Registrierung, Messung und Monatsabrechnung.',
+      interestedCta: 'Ich interessiere mich für Energiegemeinschaften',
+      interestedSubject: 'Interesse an Energiegemeinschaft',
       loginTitle: 'Anmeldung',
       loginMessage: 'Bitte melden Sie sich zuerst an, um einer Gemeinschaft beizutreten.',
       applySentTitle: 'Antrag gesendet',
@@ -1679,6 +1712,11 @@ export const translations: Record<Language, Translations> = {
       deleteTitle: 'RFID-Tag löschen?',
       delete: 'Löschen',
       noTags: 'Keine RFID-Karten',
+    },
+    about: {
+      legal: 'Rechtliche Informationen',
+      privacy: 'Datenschutz',
+      website: 'Webseite',
     },
     walletHistory: {
       title: 'Wallet-Verlauf',
@@ -1805,6 +1843,7 @@ export const translations: Record<Language, Translations> = {
       estimatedPrice: 'Szacunkowa cena',
       emptyStateTitle: 'Zaplanuj podróż',
       emptyStateDesc: 'Wprowadź start i cel, a znajdziemy optymalne przystanki ładowania z sieci ZAspot',
+      routeIncomplete: 'Uwaga: na części trasy nie ma stacji ładowania w naszej sieci. Plan może być niepełny — sprawdź pokrycie w pobliżu celu.',
     },
     profile: {
       title: 'Profil',
@@ -2059,6 +2098,9 @@ export const translations: Record<Language, Translations> = {
       infoText: 'Energetyka społeczna pozwala dzielić się wyprodukowaną energią między członkami społeczności i oszczędzać na rachunkach za prąd.',
       availableCommunities: 'Dostępne społeczności',
       noCommunities: 'Brak aktywnych społeczności',
+      howItWorks: 'Jak to działa: producenci (np. z fotowoltaiką) dzielą się nadwyżkami energii z konsumentami w społeczności przez sieć dystrybucyjną (EDC). Konsumenci płacą mniej niż u dostawcy, producenci zarabiają więcej niż przy sprzedaży do sieci. ZAspot zajmuje się rejestracją EDC, pomiarami i miesięcznym rozliczeniem.',
+      interestedCta: 'Jestem zainteresowany energetyką społecznościową',
+      interestedSubject: 'Zainteresowanie energetyką społecznościową',
       loginTitle: 'Logowanie',
       loginMessage: 'Zaloguj się najpierw, aby dołączyć do społeczności.',
       applySentTitle: 'Wniosek wysłany',
@@ -2093,6 +2135,11 @@ export const translations: Record<Language, Translations> = {
       deleteTitle: 'Usunąć tag RFID?',
       delete: 'Usuń',
       noTags: 'Brak kart RFID',
+    },
+    about: {
+      legal: 'Informacje prawne',
+      privacy: 'Polityka prywatności',
+      website: 'Strona internetowa',
     },
     walletHistory: {
       title: 'Historia portfela',

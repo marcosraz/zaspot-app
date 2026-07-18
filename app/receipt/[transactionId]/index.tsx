@@ -115,6 +115,8 @@ export default function ReceiptScreen() {
   @page { size: A4; margin: 16mm; }
   body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #111; line-height: 1.4; }
   h1 { color: #16A34A; margin: 0 0 4px; font-size: 26px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .brand img { width: 44px; height: 44px; border-radius: 10px; }
   .sub { color: #6B7280; font-size: 13px; margin-bottom: 24px; }
   .card { border: 1px solid #E5E7EB; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
   .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #F3F4F6; }
@@ -131,7 +133,10 @@ export default function ReceiptScreen() {
 </style>
 </head>
 <body>
-  <h1>ZAspot</h1>
+  <div class="brand">
+    <img src="https://www.zaspot.cz/images/LogoZ.png" alt="ZAspot" />
+    <h1>ZAspot</h1>
+  </div>
   <div class="sub">${l.title} #${r.transactionId} · <span class="badge">${r.status === 'completed' ? l.completed : l.active}</span></div>
 
   <div class="card">
