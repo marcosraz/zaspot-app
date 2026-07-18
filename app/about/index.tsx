@@ -31,6 +31,7 @@ export default function AboutScreen() {
   const LINKS: { icon: keyof typeof Ionicons.glyphMap; label: string; url: string }[] = [
     { icon: 'globe-outline', label: t.about.website, url: 'https://www.zaspot.cz' },
     { icon: 'document-text-outline', label: t.about.legal, url: 'https://www.zaspot.cz/cs/legal' },
+    { icon: 'reader-outline', label: t.about.terms, url: 'https://www.zaspot.cz/cs/vop' },
     { icon: 'shield-checkmark-outline', label: t.about.privacy, url: 'https://www.zaspot.cz/cs/privacy' },
   ];
 

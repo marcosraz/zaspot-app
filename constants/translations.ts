@@ -442,6 +442,7 @@ export interface Translations {
   about: {
     legal: string;
     privacy: string;
+    terms: string;
     website: string;
   };
 
@@ -869,6 +870,7 @@ export const translations: Record<Language, Translations> = {
     },
     about: {
       legal: 'Právní informace',
+      terms: 'Obchodní podmínky',
       privacy: 'Ochrana osobních údajů',
       website: 'Webové stránky',
     },
@@ -1292,6 +1294,7 @@ export const translations: Record<Language, Translations> = {
     },
     about: {
       legal: 'Legal information',
+      terms: 'Terms & conditions',
       privacy: 'Privacy policy',
       website: 'Website',
     },
@@ -1715,6 +1718,7 @@ export const translations: Record<Language, Translations> = {
     },
     about: {
       legal: 'Rechtliche Informationen',
+      terms: 'AGB (Obchodní podmínky)',
       privacy: 'Datenschutz',
       website: 'Webseite',
     },
@@ -2138,6 +2142,7 @@ export const translations: Record<Language, Translations> = {
     },
     about: {
       legal: 'Informacje prawne',
+      terms: 'Regulamin',
       privacy: 'Polityka prywatności',
       website: 'Strona internetowa',
     },
