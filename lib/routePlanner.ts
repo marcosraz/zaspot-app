@@ -49,9 +49,24 @@ export interface RouteResult {
   /** True when the charging network has a gap on this corridor — the plan
    *  could not cover the whole distance and must not be trusted blindly. */
   incomplete?: boolean;
+  /** Stations along the corridor that match the user's filters — shown as
+   *  optional stops even when the battery makes the trip without charging
+   *  ("route shows distance but no charging places" feedback). */
+  suggestedStations?: SuggestedStation[];
+}
+
+export interface SuggestedStation {
+  station: ChargingStation;
+  distanceFromStartKm: number;
+  priceCzk: number | null;
 }
 
 // Constants for route calculation
+// Roads are not straight lines: real driving distance averages ~25% above the
+// great-circle distance. Planning with raw air distance underestimated routes
+// (Brno→Karlovy Vary: 253 km air vs ~380 km road) → "no charging needed" on
+// trips that clearly need a stop.
+const ROAD_DISTANCE_FACTOR = 1.25;
 const AVERAGE_SPEED_KMH = 90;           // Average highway speed
 const CONSUMPTION_KWH_PER_100KM = 18;   // Average EV consumption
 const CHARGING_EFFICIENCY = 0.9;        // 90% charging efficiency
@@ -127,7 +142,13 @@ export async function planRoute(
   connectorType?: string,
   options: RoutePlanOptions = {}
 ): Promise<RouteResult> {
-  const totalDistance = calculateDistance(
+  // All planning distances are "road km" — air distance × ROAD_DISTANCE_FACTOR.
+  // Uniform scaling keeps corridor ratios intact while making battery math and
+  // the displayed distance realistic.
+  const routeDist = (lat1: number, lon1: number, lat2: number, lon2: number) =>
+    calculateDistance(lat1, lon1, lat2, lon2) * ROAD_DISTANCE_FACTOR;
+
+  const totalDistance = routeDist(
     from.latitude,
     from.longitude,
     to.latitude,
@@ -145,21 +166,11 @@ export async function planRoute(
   let totalChargingTime = 0;
   let totalChargingCost = 0;
 
-  // If we can make it, no stops needed
-  if (batteryAfterTrip >= ARRIVAL_TARGET_PERCENT) {
-    return {
-      from,
-      to,
-      totalDistance,
-      totalDuration: calculateDrivingTime(totalDistance),
-      drivingDuration: calculateDrivingTime(totalDistance),
-      chargingDuration: 0,
-      totalCost: 0,
-      stops: [],
-    };
-  }
+  // Whether stops are REQUIRED — the station pool is loaded either way, so the
+  // result can always list matching stations along the corridor as optional
+  // stops ("shows distance but no charging places" feedback).
+  const noStopsNeeded = batteryAfterTrip >= ARRIVAL_TARGET_PERCENT;
 
-  // We need charging stops
   // Find stations along the route corridor
   const midLat = (from.latitude + to.latitude) / 2;
   const midLon = (from.longitude + to.longitude) / 2;
@@ -249,13 +260,13 @@ export async function planRoute(
   // Filter stations that are roughly along the route
   // Simple heuristic: station should be between from and to
   const stationsAlongRoute = compatibleStations.filter(station => {
-    const distToFrom = calculateDistance(
+    const distToFrom = routeDist(
       from.latitude,
       from.longitude,
       station.latitude,
       station.longitude
     );
-    const distToTo = calculateDistance(
+    const distToTo = routeDist(
       station.latitude,
       station.longitude,
       to.latitude,
@@ -267,10 +278,61 @@ export async function planRoute(
 
   // Sort by distance from start
   stationsAlongRoute.sort((a, b) => {
-    const distA = calculateDistance(from.latitude, from.longitude, a.latitude, a.longitude);
-    const distB = calculateDistance(from.latitude, from.longitude, b.latitude, b.longitude);
+    const distA = routeDist(from.latitude, from.longitude, a.latitude, a.longitude);
+    const distB = routeDist(from.latitude, from.longitude, b.latitude, b.longitude);
     return distA - distB;
   });
+
+  // Optional stops along the corridor, matching the user's filters (power,
+  // price, connector, network) — spread across the route by taking the closest
+  // corridor stations at evenly spaced waypoints, so the list isn't just the
+  // 10 stations nearest to the start.
+  const buildSuggestions = (usedIds: Set<string | number>): SuggestedStation[] => {
+    const out: SuggestedStation[] = [];
+    const seen = new Set(usedIds);
+    const SLOTS = 10;
+    for (let i = 1; i <= SLOTS; i++) {
+      const f = i / (SLOTS + 1);
+      const wp = {
+        latitude: from.latitude + (to.latitude - from.latitude) * f,
+        longitude: from.longitude + (to.longitude - from.longitude) * f,
+      };
+      let best: ChargingStation | null = null;
+      let bestDist = Infinity;
+      for (const s of stationsAlongRoute) {
+        if (seen.has(s.id)) continue;
+        const d = calculateDistance(wp.latitude, wp.longitude, s.latitude, s.longitude);
+        if (d < bestDist) { bestDist = d; best = s; }
+      }
+      if (best && bestDist < 40) {
+        seen.add(best.id);
+        out.push({
+          station: best,
+          distanceFromStartKm: Math.round(
+            routeDist(from.latitude, from.longitude, best.latitude, best.longitude)
+          ),
+          priceCzk: priceCtx ? getStationPriceCzk(best, priceCtx) : null,
+        });
+      }
+    }
+    return out.sort((a, b) => a.distanceFromStartKm - b.distanceFromStartKm);
+  };
+
+  // Battery makes it without charging — still return the corridor stations as
+  // optional stops instead of a bare distance number.
+  if (noStopsNeeded) {
+    return {
+      from,
+      to,
+      totalDistance: Math.round(totalDistance),
+      totalDuration: Math.round(calculateDrivingTime(totalDistance)),
+      drivingDuration: Math.round(calculateDrivingTime(totalDistance)),
+      chargingDuration: 0,
+      totalCost: 0,
+      stops: [],
+      suggestedStations: buildSuggestions(new Set()),
+    };
+  }
 
   // Plan stops
   let distanceTraveled = 0;
@@ -292,19 +354,19 @@ export async function planRoute(
     // route) could be picked; its second condition (distToStation >
     // distanceTraveled) was meaningless. Require each stop to cut the
     // remaining distance by at least 10 km.
-    const currentDistToGoal = calculateDistance(
+    const currentDistToGoal = routeDist(
       currentPosition.latitude, currentPosition.longitude,
       to.latitude, to.longitude
     );
     const reachableStations = stationsAlongRoute.filter(station => {
-      const distToStation = calculateDistance(
+      const distToStation = routeDist(
         currentPosition.latitude,
         currentPosition.longitude,
         station.latitude,
         station.longitude
       );
       if (distToStation <= 0.5 || distToStation >= rangeWithCurrentBattery) return false;
-      const stationDistToGoal = calculateDistance(
+      const stationDistToGoal = routeDist(
         station.latitude, station.longitude,
         to.latitude, to.longitude
       );
@@ -336,7 +398,7 @@ export async function planRoute(
     );
 
     // Calculate stop details
-    const distToStation = calculateDistance(
+    const distToStation = routeDist(
       currentPosition.latitude,
       currentPosition.longitude,
       bestStation.latitude,
@@ -347,7 +409,7 @@ export async function planRoute(
     const arrivalBattery = currentBattery - batteryUsedToStation;
 
     // Calculate how much to charge
-    const distStationToEnd = calculateDistance(
+    const distStationToEnd = routeDist(
       bestStation.latitude,
       bestStation.longitude,
       to.latitude,
@@ -395,7 +457,7 @@ export async function planRoute(
     // Remaining distance from the ACTUAL current position — the old
     // totalDistance − distanceTraveled went negative on detours and
     // terminated the loop while still hundreds of km from the goal.
-    remainingDistance = calculateDistance(
+    remainingDistance = routeDist(
       currentPosition.latitude, currentPosition.longitude,
       to.latitude, to.longitude
     );
@@ -420,6 +482,7 @@ export async function planRoute(
     totalCost: Math.round(totalChargingCost),
     stops,
     incomplete: routeIncomplete,
+    suggestedStations: buildSuggestions(new Set(stops.map((s) => s.station.id))),
   };
 }
 

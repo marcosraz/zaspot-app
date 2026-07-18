@@ -596,6 +596,45 @@ export default function RouteScreen() {
                 ))}
               </>
             )}
+
+            {/* Optional stations along the corridor — respects the user's
+                filters; the answer to "route shows distance but no chargers" */}
+            {(routeResult.suggestedStations?.length ?? 0) > 0 && (
+              <>
+                <View style={styles.stopsHeader}>
+                  <Ionicons name="location" size={20} color="#3B82F6" />
+                  <Text style={[styles.stopsTitle, { color: colors.text }]}>
+                    {t.route.stationsAlongRoute} ({routeResult.suggestedStations!.length})
+                  </Text>
+                </View>
+
+                {routeResult.suggestedStations!.map((s) => (
+                  <View key={s.station.id} style={[styles.suggestRow, { backgroundColor: colors.surface }]}>
+                    <View style={[
+                      styles.typeBadge,
+                      { backgroundColor: s.station.type === 'DC' ? '#EF4444' : Colors.brand.accentGreen }
+                    ]}>
+                      <Text style={styles.typeBadgeText}>{s.station.type}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.stopName, { color: colors.text }]} numberOfLines={1}>
+                        {s.station.name}
+                      </Text>
+                      <Text style={[styles.stopDistance, { color: colors.textSecondary }]}>
+                        {s.distanceFromStartKm} km {t.route.fromStart} · {s.station.power_kw} kW
+                        {s.priceCzk != null ? ` · ${s.priceCzk.toFixed(2)} Kč/kWh` : ''}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => navigateToStation(s.station.latitude, s.station.longitude, s.station.name)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    >
+                      <Ionicons name="navigate-outline" size={20} color={Colors.brand.accentGreen} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </>
+            )}
           </>
         )}
 
@@ -833,6 +872,14 @@ const styles = StyleSheet.create({
   stopsTitle: {
     fontSize: Layout.fontSize.lg,
     fontWeight: '600',
+  },
+  suggestRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
   },
   stopCard: {
     borderRadius: Layout.borderRadius.xl,

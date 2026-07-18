@@ -123,6 +123,7 @@ export interface Translations {
     emptyStateTitle: string;
     emptyStateDesc: string;
     routeIncomplete: string;
+    stationsAlongRoute: string;
   };
 
   // Profile screen
@@ -576,6 +577,7 @@ export const translations: Record<Language, Translations> = {
       emptyStateTitle: 'Naplánujte si cestu',
       emptyStateDesc: 'Zadejte odkud a kam jedete, a najdeme vám optimální nabíjecí zastávky ze sítě ZAspot',
       routeIncomplete: 'Pozor: na části trasy nejsou v naší síti nabíjecí stanice. Trasa může být neúplná — zkontrolujte pokrytí v cílové oblasti.',
+      stationsAlongRoute: 'Stanice na trase',
     },
     profile: {
       title: 'Profil',
@@ -1000,6 +1002,7 @@ export const translations: Record<Language, Translations> = {
       emptyStateTitle: 'Plan your trip',
       emptyStateDesc: 'Enter your start and destination, and we\'ll find optimal charging stops from the ZAspot network',
       routeIncomplete: 'Warning: parts of this route have no charging stations in our network. The plan may be incomplete — check coverage near your destination.',
+      stationsAlongRoute: 'Stations along the route',
     },
     profile: {
       title: 'Profile',
@@ -1424,6 +1427,7 @@ export const translations: Record<Language, Translations> = {
       emptyStateTitle: 'Planen Sie Ihre Reise',
       emptyStateDesc: 'Geben Sie Start und Ziel ein, und wir finden optimale Ladestopps im ZAspot-Netzwerk',
       routeIncomplete: 'Achtung: Auf Teilen der Route gibt es keine Ladestationen in unserem Netz. Der Plan kann unvollständig sein — Abdeckung am Ziel prüfen.',
+      stationsAlongRoute: 'Stationen entlang der Route',
     },
     profile: {
       title: 'Profil',
@@ -1848,6 +1852,7 @@ export const translations: Record<Language, Translations> = {
       emptyStateTitle: 'Zaplanuj podróż',
       emptyStateDesc: 'Wprowadź start i cel, a znajdziemy optymalne przystanki ładowania z sieci ZAspot',
       routeIncomplete: 'Uwaga: na części trasy nie ma stacji ładowania w naszej sieci. Plan może być niepełny — sprawdź pokrycie w pobliżu celu.',
+      stationsAlongRoute: 'Stacje na trasie',
     },
     profile: {
       title: 'Profil',
