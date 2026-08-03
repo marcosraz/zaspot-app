@@ -27,6 +27,7 @@ import { useVehicle, POPULAR_VEHICLES, VehicleProfile } from '../../context/Vehi
 import { useNotifications } from '../../context/NotificationsContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import {
   RegisteredVehicle,
   PendingVehicle,
@@ -79,6 +80,7 @@ function MenuItem({ icon, label, value, onPress, showArrow = true, rightElement,
 }
 
 export default function ProfileScreen() {
+  const scrollPadding = useTabBarScrollPadding();
   const { colors, isDark, toggleTheme, setTheme } = useTheme();
   const { t, language, setLanguage, availableLanguages } = useLanguage();
   const { currency, toggleCurrency, format } = useCurrency();
@@ -275,7 +277,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPadding }]}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>
@@ -1072,6 +1074,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.spacing.md,
+    // wird zur Laufzeit durch useTabBarScrollPadding() überschrieben
     paddingBottom: 100,
   },
   header: {

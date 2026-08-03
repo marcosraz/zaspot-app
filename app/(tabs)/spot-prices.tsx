@@ -21,6 +21,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import { useNotifications } from '../../context/NotificationsContext';
 import {
   fetchSpotPrices,
@@ -34,6 +35,7 @@ import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 type TimeRange = 'today' | 'week' | 'month';
 
 export default function SpotPricesScreen() {
+  const scrollPadding = useTabBarScrollPadding();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { checkPriceAndNotify } = useNotifications();
@@ -182,7 +184,7 @@ export default function SpotPricesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPadding }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -511,6 +513,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.spacing.md,
+    // wird zur Laufzeit durch useTabBarScrollPadding() überschrieben
     paddingBottom: 100,
   },
   loadingContainer: {

@@ -24,6 +24,7 @@ import { useVehicle } from '../../context/VehicleContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import {
   planRoute,
   geocodeLocation,
@@ -33,6 +34,7 @@ import {
 import { openNavigationTo } from '../../lib/navigation';
 
 export default function RouteScreen() {
+  const scrollPadding = useTabBarScrollPadding();
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { settings, activeVehicle } = useVehicle();
@@ -193,7 +195,7 @@ export default function RouteScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPadding }]}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={[styles.title, { color: colors.text }]}>
@@ -661,6 +663,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.spacing.md,
+    // wird zur Laufzeit durch useTabBarScrollPadding() überschrieben
     paddingBottom: 100,
   },
   header: {

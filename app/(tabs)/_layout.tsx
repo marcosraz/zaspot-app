@@ -5,7 +5,7 @@
 
 import { Tabs } from 'expo-router';
 import { useEffect } from 'react';
-import { Platform, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, {
   useAnimatedStyle,
@@ -16,6 +16,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useTabBarInsets } from '../../hooks/useTabBarHeight';
 
 type IoniconsName = keyof typeof Ionicons.glyphMap;
 
@@ -61,6 +62,7 @@ function TabIcon({ name, color, focused }: TabIconProps) {
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
+  const { height: tabBarHeight, bottomInset } = useTabBarInsets();
 
   return (
     <Tabs
@@ -73,8 +75,10 @@ export default function TabLayout() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          height: Platform.OS === 'ios' ? 88 : 70,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 10,
+          // Höhe/Abstand richten sich nach der System-Navigation, sonst liegen
+          // die Labels unter dem Gestenbalken bzw. der Drei-Tasten-Leiste.
+          height: tabBarHeight,
+          paddingBottom: bottomInset,
           paddingTop: 10,
           elevation: 8,
           shadowColor: '#000',

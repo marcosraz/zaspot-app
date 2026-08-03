@@ -24,6 +24,7 @@ import { useNotifications } from '../../context/NotificationsContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import { fetchSpotPrices, getCurrentSlot, getPriceColor, DailyPrices } from '../../lib/spotPrices';
 import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../lib/stations';
 import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
@@ -41,6 +42,7 @@ interface QuickAction {
 }
 
 export default function HomeScreen() {
+  const scrollPadding = useTabBarScrollPadding();
   const { colors, isDark } = useTheme();
   const { t, language } = useLanguage();
   const { favorites, isLoaded: favoritesLoaded } = useFavorites();
@@ -168,7 +170,7 @@ export default function HomeScreen() {
     // so the screen doesn't "jump" when real data replaces it.
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={styles.scrollContent}>
+        <View style={[styles.scrollContent, { paddingBottom: scrollPadding }]}>
           <View style={[styles.header, { marginBottom: Layout.spacing.md }]}>
             <View style={{ gap: 8 }}>
               <Skeleton width={90} height={14} />
@@ -194,7 +196,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: scrollPadding }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -548,6 +550,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: Layout.spacing.md,
+    // wird zur Laufzeit durch useTabBarScrollPadding() überschrieben
     paddingBottom: 100,
   },
   loadingContainer: {
