@@ -181,3 +181,114 @@ export async function fetchStationsByIds(ids: string[]): Promise<ChargingStation
     return [];
   }
 }
+
+/** Luftlinie in km (Haversine). */
+export function distanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+export type NearbyKind = 'ocpp' | 'roaming' | 'directory';
+
+export interface NearbyStation extends ChargingStation {
+  kind: NearbyKind;
+  distance_km: number;
+}
+
+/** Welcher Typ — bestimmt, was ein Tipp auf die Station auslöst. */
+export function stationKind(station: ChargingStation): NearbyKind {
+  if (station.is_ocpp === true) return 'ocpp';
+  if (typeof station.id === 'string' && station.id.startsWith('emp-')) return 'roaming';
+  return 'directory';
+}
+
+/**
+ * Stationen im Umkreis aus ALLEN drei Quellen.
+ *
+ * Vorher fragte der Homescreen nur /charging-stations ab — ein Verzeichnis
+ * fremder Stationen, in dem unsere eigenen 33 OCPP-Stationen gar nicht
+ * vorkommen. Ergebnis: neben einer ZAspot-Station standen drei fremde in der
+ * Liste, und jeder Tipp lief in die Detailseite, die nur OCPP-Stationen kennt.
+ *
+ * Sortierung: eigene zuerst, dann Roaming, dann Verzeichnis — innerhalb jeder
+ * Gruppe nach Entfernung.
+ */
+export async function fetchNearbyStationsMixed(
+  latitude: number,
+  longitude: number,
+  radiusKm: number = 20,
+  limit: number = 3
+): Promise<NearbyStation[]> {
+  const { fetchEmpStations } = await import('./v2Features');
+
+  const [own, directory, emp] = await Promise.all([
+    fetchOcppStations().catch(() => [] as ChargingStation[]),
+    fetchStations().catch(() => [] as ChargingStation[]),
+    fetchEmpStations({
+      lat: latitude,
+      lng: longitude,
+      radius_km: radiusKm,
+      limit: 50,
+      groupByLocation: true,
+    })
+      .then((res) => (res.ok && res.data?.success ? res.data.stations : []))
+      .catch(() => []),
+  ]);
+
+  const roaming: ChargingStation[] = emp.map((s) => ({
+    id: 'emp-' + s.evse_id,
+    external_id: s.evse_id,
+    name: s.name,
+    address: s.address,
+    city: null,
+    postal_code: null,
+    country: 'EU',
+    latitude: s.latitude,
+    longitude: s.longitude,
+    type: (s.max_power_kw >= 50 ? 'DC' : 'AC') as 'AC' | 'DC',
+    power_kw: s.max_power_kw,
+    price_per_kwh: s.price_per_kwh,
+    available: s.status === 'available',
+    status: (s.status === 'available'
+      ? 'operational'
+      : 'offline') as ChargingStation['status'],
+    operator: s.operator,
+    operator_phone: null,
+    connector_types: s.connectors.map((c) => c.type),
+    num_connectors: Math.max(s.evse_count ?? 1, s.connectors.length),
+  })) as ChargingStation[];
+
+  const rank: Record<NearbyKind, number> = { ocpp: 0, roaming: 1, directory: 2 };
+  const seen = new Set<string>();
+  const result: NearbyStation[] = [];
+
+  for (const station of [...own, ...roaming, ...directory]) {
+    if (seen.has(station.id)) continue;
+    if (station.latitude == null || station.longitude == null) continue;
+    if (station.status !== 'operational') continue;
+
+    const distance = distanceKm(latitude, longitude, station.latitude, station.longitude);
+    if (distance > radiusKm) continue;
+
+    seen.add(station.id);
+    result.push({ ...station, kind: stationKind(station), distance_km: distance });
+  }
+
+  result.sort(
+    (a, b) => rank[a.kind] - rank[b.kind] || a.distance_km - b.distance_km
+  );
+
+  return result.slice(0, limit);
+}

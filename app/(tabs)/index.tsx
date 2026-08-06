@@ -26,7 +26,13 @@ import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import { fetchSpotPrices, getCurrentSlot, getPriceColor, DailyPrices } from '../../lib/spotPrices';
-import { fetchNearbyStations, fetchStationsByIds, ChargingStation } from '../../lib/stations';
+import {
+  fetchNearbyStationsMixed,
+  fetchStationsByIds,
+  ChargingStation,
+  NearbyStation,
+} from '../../lib/stations';
+import { openNavigationTo } from '../../lib/navigation';
 import { fetchEffectivePrices, EffectivePrices } from '../../lib/pricing';
 import FavoriteButton from '../../components/FavoriteButton';
 import ActiveChargingWidget from '../../components/ActiveChargingWidget';
@@ -52,7 +58,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [priceData, setPriceData] = useState<DailyPrices | null>(null);
-  const [nearbyStations, setNearbyStations] = useState<ChargingStation[]>([]);
+  const [nearbyStations, setNearbyStations] = useState<NearbyStation[]>([]);
   const [favoriteStations, setFavoriteStations] = useState<ChargingStation[]>([]);
   const [effectivePrices, setEffectivePrices] = useState<EffectivePrices | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -103,12 +109,16 @@ export default function HomeScreen() {
             new Promise<any>((resolve) => setTimeout(() => resolve(null), 4000)),
           ])) || (await Location.getLastKnownPositionAsync());
         if (location) {
-          const stations = await fetchNearbyStations(
+          // Eigene OCPP-Stationen + Hubject-Roaming + fremdes Verzeichnis,
+          // eigene zuerst. Vorher kam nur das Verzeichnis — dort fehlen unsere
+          // eigenen Stationen komplett.
+          const stations = await fetchNearbyStationsMixed(
             location.coords.latitude,
             location.coords.longitude,
-            20 // 20km radius
+            20, // 20km radius
+            3
           );
-          setNearbyStations(stations.slice(0, 3)); // Show top 3
+          setNearbyStations(stations)
           setLocationError(null);
         }
       } else {
@@ -116,6 +126,20 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error('Error loading nearby stations:', error);
+    }
+  }, []);
+
+  // Ein Tipp auf eine Station muss zu etwas führen, das es auch gibt:
+  // eigene Station -> Detailseite (kennt nur OCPP-Ladepunkte),
+  // Hubject-Roaming -> Roaming-Screen mit Start/Stop,
+  // fremdes Verzeichnis -> es existiert keine Detailseite, also Navigation.
+  const openNearbyStation = useCallback((station: NearbyStation) => {
+    if (station.kind === 'ocpp') {
+      router.push(`/station/${station.id}`);
+    } else if (station.kind === 'roaming') {
+      router.push('/emp-stations');
+    } else {
+      openNavigationTo(station.latitude, station.longitude, station.name);
     }
   }, []);
 
@@ -480,7 +504,7 @@ export default function HomeScreen() {
               <Animated.View key={station.id} entering={FadeInDown.delay(idx * 60).springify().damping(16)}>
               <PressableScale
                 style={[styles.stationCard, { backgroundColor: colors.surface }]}
-                onPress={() => router.push(`/station/${station.id}`)}
+                onPress={() => openNearbyStation(station)}
               >
                 <View style={[
                   styles.stationTypeIcon,
@@ -493,11 +517,20 @@ export default function HomeScreen() {
                     {station.name}
                   </Text>
                   <Text style={[styles.stationAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                    {station.distance_km < 10
+                      ? station.distance_km.toFixed(1)
+                      : Math.round(station.distance_km)}{' km · '}
                     {station.address}
                   </Text>
                 </View>
                 <View style={styles.stationMeta}>
-                  <FavoriteButton stationId={station.id} size={20} />
+                  {/* Verzeichnis-Stationen haben keine Detailseite — der Tipp
+                      öffnet die Navigation, das Symbol kündigt das an. */}
+                  {station.kind === 'directory' ? (
+                    <Ionicons name="navigate-outline" size={18} color={colors.textMuted} />
+                  ) : (
+                    <FavoriteButton stationId={station.id} size={20} />
+                  )}
                   <View style={[
                     styles.typeBadge,
                     { backgroundColor: station.type === 'DC' ? '#FEE2E2' : '#ECFDF5' }
