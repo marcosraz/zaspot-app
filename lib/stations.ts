@@ -128,7 +128,7 @@ export async function fetchOcppStations(): Promise<ChargingStation[]> {
           available: isAvailable,
           status: cp.isOnline ? 'operational' : 'offline',
           operator: 'ZAspot',
-          operator_phone: null,
+          operator_phone: '+420 770 103 103',
           connector_types: physicalConnectors
             .map((c: any) => c.connectorType)
             .filter(Boolean),
