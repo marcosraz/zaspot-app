@@ -166,7 +166,8 @@ export default function MapScreen() {
     // (the representative row only carries the top EVSE's plug list).
     num_connectors: Math.max(s.evse_count, s.connectors.length),
     access_hours: '24/7',
-    parking_fee: false,
+    // Hubject liefert keine Parkinfo — null = keine Angabe
+    parking_fee: null,
     description: null,
   });
 

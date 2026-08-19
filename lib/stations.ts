@@ -35,7 +35,8 @@ export interface ChargingStation {
   connector_types: string[];
   num_connectors: number;
   access_hours: string;
-  parking_fee: boolean;
+  // null = keine Angabe, false = gratis ("Zdarma"), true = kostenpflichtig
+  parking_fee: boolean | null;
   description: string | null;
   // ZAspot-eigene OCPP-Stationen
   is_ocpp?: boolean;
@@ -133,7 +134,7 @@ export async function fetchOcppStations(): Promise<ChargingStation[]> {
             .filter(Boolean),
           num_connectors: physicalConnectors.length || 1,
           access_hours: '24/7',
-          parking_fee: false,
+          parking_fee: cp.parkingFee ?? null,
           description: null,
           is_ocpp: true,
           connectors: physicalConnectors
