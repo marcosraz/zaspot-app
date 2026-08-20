@@ -36,6 +36,10 @@ import { LiveStationPrice } from '../../components/LiveStationPrice';
 import { loadPriceContext, getStationPriceCzk, sortByPrice, PriceContext } from '../../lib/stationPrices';
 import { calculateDistance } from '../../lib/routePlanner';
 
+// Diakritika-unempfindlich: "popuvky" findet auch "Popůvky"
+const normalizeText = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 // Region type
 type Region = {
   latitude: number;
@@ -290,15 +294,29 @@ export default function MapScreen() {
       if (p == null || p > filters.maxPrice) return false;
     }
     if (debouncedQuery) {
-      const query = debouncedQuery.toLowerCase();
+      const query = normalizeText(debouncedQuery);
       return (
-        station.name?.toLowerCase().includes(query) ||
-        station.city?.toLowerCase().includes(query) ||
-        station.address?.toLowerCase().includes(query)
+        (station.name ? normalizeText(station.name).includes(query) : false) ||
+        (station.city ? normalizeText(station.city).includes(query) : false) ||
+        (station.address ? normalizeText(station.address).includes(query) : false)
       );
     }
     return true;
   }), [allStations, filters, debouncedQuery, priceCtx, isFavorite]);
+
+  // Suchvorschläge unter der Suchleiste: Tippen → Top-5-Stationen, Tap zentriert
+  // die Karte und öffnet das Detail (wie die Stationssuche auf der Web-Karte)
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const searchSuggestions = useMemo(() => {
+    if (!showSuggestions || searchQuery.trim().length < 2) return [];
+    const q = normalizeText(searchQuery.trim());
+    return allStations
+      .filter(s =>
+        (s.name ? normalizeText(s.name).includes(q) : false) ||
+        (s.address ? normalizeText(s.address).includes(q) : false)
+      )
+      .slice(0, 5);
+  }, [allStations, searchQuery, showSuggestions]);
 
   // "Nejlevnější v okolí" — filtered stations within 30 km of the user
   // (whole filtered set as fallback without GPS), price-ascending, top 20.
@@ -396,16 +414,32 @@ export default function MapScreen() {
   // Runs after map.ready (post-message from Leaflet init) so updateMarkers exists.
   useEffect(() => {
     if (mapStatus !== 'loaded' || !webViewRef.current) return;
+    // Deckungsgleiche Stationen (z.B. Panorama Hotel 1+2) minimal auffächern,
+    // sonst verdeckt der obere Pin den unteren dauerhaft
+    const coordSeen: Record<string, number> = {};
     const stationsJson = JSON.stringify(
-      filteredStations.map((s) => ({
-        id: s.id,
-        lat: Number(s.latitude),
-        lng: Number(s.longitude),
-        name: s.name,
-        isOcpp: s.is_ocpp === true,
-        isEmp: typeof s.id === 'string' && s.id.startsWith('emp-'),
-        available: s.available === true,
-      }))
+      filteredStations.map((s) => {
+        let lat = Number(s.latitude);
+        let lng = Number(s.longitude);
+        const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        const n = coordSeen[key] ?? 0;
+        coordSeen[key] = n + 1;
+        if (n > 0) {
+          const angle = (n * 2 * Math.PI) / 8;
+          const r = 0.00012 * Math.ceil(n / 8);
+          lat += r * Math.sin(angle);
+          lng += r * Math.cos(angle);
+        }
+        return {
+          id: s.id,
+          lat,
+          lng,
+          name: s.name,
+          isOcpp: s.is_ocpp === true,
+          isEmp: typeof s.id === 'string' && s.id.startsWith('emp-'),
+          available: s.available === true,
+        };
+      })
     );
     const js = `window.updateMarkers && window.updateMarkers(${stationsJson}); true;`;
     webViewRef.current.injectJavaScript(js);
@@ -569,10 +603,10 @@ export default function MapScreen() {
               placeholder={t.map.searchPlaceholder}
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
-              onChangeText={setSearchQuery}
+              onChangeText={(text) => { setSearchQuery(text); setShowSuggestions(true); }}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <TouchableOpacity onPress={() => { setSearchQuery(''); setShowSuggestions(false); }}>
                 <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
             )}
@@ -585,6 +619,35 @@ export default function MapScreen() {
             {hasActiveFilters && <View style={styles.filterActiveDot} />}
           </TouchableOpacity>
         </View>
+
+        {/* Suchvorschläge: Tap zentriert Karte + öffnet Stations-Detail */}
+        {searchSuggestions.length > 0 && (
+          <View style={[styles.suggestionsBox, { backgroundColor: colors.surface }]}>
+            {searchSuggestions.map((s) => (
+              <TouchableOpacity
+                key={String(s.id)}
+                style={styles.suggestionRow}
+                onPress={() => {
+                  setShowSuggestions(false);
+                  setSearchQuery(s.name);
+                  focusStation(s);
+                }}
+              >
+                <Ionicons name="flash" size={16} color={Colors.brand.accentGreen} style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.suggestionName, { color: colors.text }]} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  {!!s.address && (
+                    <Text style={[styles.suggestionAddress, { color: colors.textSecondary }]} numberOfLines={1}>
+                      {s.address}
+                    </Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         <View style={styles.controlsRow} pointerEvents="box-none">
           {/* Network Filter Toggle (matches web charging-map) */}
@@ -1195,6 +1258,31 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     gap: 10,
+  },
+  suggestionsBox: {
+    marginTop: 6,
+    borderRadius: 12,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  suggestionRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  suggestionName: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  suggestionAddress: {
+    fontSize: 12,
+    marginTop: 1,
   },
   controlsRow: {
     flexDirection: 'row',
