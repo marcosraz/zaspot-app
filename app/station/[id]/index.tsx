@@ -521,6 +521,10 @@ export default function StationDetailScreen() {
           const statusColor = getConnectorStatusColor(connector.status);
           const isCharging = connector.status === 'Charging';
           const isAvailable = connector.status === 'Available';
+          // 'Preparing' = cable plugged in, station waiting for authorization —
+          // this is THE moment the user wants to press Start (Circontrol etc. only
+          // start a RemoteStart-session on a connector that has an EV attached).
+          const canStart = (isAvailable || connector.status === 'Preparing') && !activeSession;
           const isStarting = actionLoading === `start-${connector.connectorId}`;
           const latestMeter = activeSession ? getLatestMeterValue(activeSession) : null;
 
@@ -632,7 +636,7 @@ export default function StationDetailScreen() {
                       </>
                     )}
                   </TouchableOpacity>
-                ) : isAvailable ? (
+                ) : canStart ? (
                   isAuthenticated ? (
                     <>
                       <TouchableOpacity
@@ -654,7 +658,7 @@ export default function StationDetailScreen() {
                           </>
                         )}
                       </TouchableOpacity>
-                      {station.reservationEnabled && (
+                      {station.reservationEnabled && isAvailable && (
                         <TouchableOpacity
                           onPress={() => handleReserve(connector)}
                           disabled={actionLoading !== null}
