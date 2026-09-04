@@ -32,6 +32,7 @@ import {
   fetchActiveEmpSession,
   EmpRoamingSession,
 } from '../../lib/v2Features';
+import { pickEvseForStart, remoteStartErrorMessage } from '../../lib/empRoaming';
 
 const SESSION_POLL_MS = 10_000;
 
@@ -110,7 +111,8 @@ export default function EmpStationsScreen() {
     if (!selected || starting) return;
     setStarting(true);
     setStartError(null);
-    const res = await empRemoteStart(selected.evse_id);
+    const picked = pickEvseForStart(selected);
+    const res = await empRemoteStart(picked?.evse_id ?? selected.evse_id);
     setStarting(false);
     if (res.ok && res.data?.success) {
       setSelected(null);
@@ -126,7 +128,7 @@ export default function EmpStationsScreen() {
       setStartError('Už máte aktivní roamingové nabíjení.');
       refreshSession();
     } else {
-      setStartError('Operátor stanice požadavek odmítl. Zkuste to znovu nebo vyberte jinou stanici.');
+      setStartError(remoteStartErrorMessage(res.data));
     }
   };
 

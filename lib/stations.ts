@@ -41,6 +41,9 @@ export interface ChargingStation {
   // ZAspot-eigene OCPP-Stationen
   is_ocpp?: boolean;
   connectors?: OcppConnector[];
+  // Hubject-Roaming-Standorte (id "emp-…"): alle Ladepunkte des Standorts,
+  // damit der Start einen freien Konnektor wählen kann.
+  emp_evses?: import('./v2Features').EmpEvse[];
 }
 
 // Fetch all stations

@@ -30,6 +30,7 @@ import { Layout } from '../../constants/layout';
 import { ChargingStation } from '../../lib/stations';
 import { fetchStationsWithCache, fetchOcppStationsWithCache, formatCacheAge } from '../../lib/stationsCache';
 import { fetchEmpStations, empRemoteStart } from '../../lib/v2Features';
+import { pickEvseForStart, describeEvse, remoteStartErrorMessage } from '../../lib/empRoaming';
 import { openNavigationTo } from '../../lib/navigation';
 import FavoriteButton from '../../components/FavoriteButton';
 import { LiveStationPrice } from '../../components/LiveStationPrice';
@@ -173,6 +174,7 @@ export default function MapScreen() {
     // Hubject liefert keine Parkinfo — null = keine Angabe
     parking_fee: null,
     description: null,
+    emp_evses: s.evses,
   });
 
   // Cap the pan-accumulated roaming cache: panning across Europe used to grow
@@ -362,10 +364,13 @@ export default function MapScreen() {
   // Mirrors the emp-stations screen flow; on success we hand off to that screen
   // which has the live session banner + stop button.
   const handleRoamingStart = (station: ChargingStation) => {
-    const evseId = String(station.id).replace(/^emp-/, '');
+    // Prefer a free connector at the site; the card's id is only the top-power EVSE.
+    const picked = pickEvseForStart({ evse_id: String(station.id).replace(/^emp-/, ''), evses: station.emp_evses ?? [] });
+    const evseId = picked?.evse_id ?? String(station.id).replace(/^emp-/, '');
+    const connectorLine = picked ? `\nKonektor: ${describeEvse(picked)}` : '';
     Alert.alert(
       'Zahájit nabíjení',
-      `${station.name}\n\nČástka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.`,
+      `${station.name}${connectorLine}\n\nČástka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.`,
       [
         { text: 'Zrušit', style: 'cancel' },
         {
@@ -384,7 +389,7 @@ export default function MapScreen() {
               Alert.alert('Aktivní nabíjení', 'Už máte aktivní roamingové nabíjení.');
               router.push('/emp-stations');
             } else {
-              Alert.alert('Chyba', 'Operátor stanice požadavek odmítl. Zkuste to znovu nebo vyberte jinou stanici.');
+              Alert.alert('Chyba', remoteStartErrorMessage(res.data));
             }
           },
         },

@@ -510,6 +510,15 @@ export async function deleteRfidTag(id: string) {
 
 // ─── EMP Roaming (Hubject Stations) ──────────────
 
+export interface EmpEvse {
+  evse_id: string;
+  power_kw: number | null;
+  power_type: string | null;
+  plugs: string[];
+  /** Hubject status: 'Available' | 'Occupied' | 'OutOfService' | 'Reserved' | 'Unknown' */
+  current_status: string | null;
+}
+
 export interface EmpStation {
   evse_id: string;
   name: string;
@@ -523,6 +532,8 @@ export interface EmpStation {
   price_per_kwh: number | null;
   /** With group=location: number of charge points at this physical site (else 1). */
   evse_count: number;
+  /** All charge points at the site (group=location); empty on older servers. */
+  evses: EmpEvse[];
 }
 
 // The /emp/stations endpoint returns DB-shaped rows (station_name, geo_lat,
@@ -551,6 +562,17 @@ function adaptEmpStation(raw: any): EmpStation {
     status,
     price_per_kwh: typeof raw?.price_per_kwh === 'number' ? raw.price_per_kwh : null,
     evse_count: typeof raw?.evse_count === 'number' && raw.evse_count > 0 ? raw.evse_count : 1,
+    evses: Array.isArray(raw?.evses)
+      ? raw.evses
+          .filter((e: any) => e && typeof e.evse_id === 'string')
+          .map((e: any) => ({
+            evse_id: e.evse_id,
+            power_kw: typeof e.power_kw === 'number' ? e.power_kw : null,
+            power_type: e.power_type ?? null,
+            plugs: Array.isArray(e.plugs) ? e.plugs.map(String) : [],
+            current_status: e.current_status ?? null,
+          }))
+      : [],
   };
 }
 
@@ -626,6 +648,13 @@ export async function empRemoteStart(evseId: string): Promise<{
     error?: string;
     balance_czk?: number;
     min_balance_czk?: number;
+    /** Why the start failed (502): 'emp_not_activated' = Hubject has not activated
+     *  our EMP account yet, 'hubject_rejected' | 'operator_rejected' otherwise. */
+    reason?: 'emp_not_activated' | 'hubject_rejected' | 'operator_rejected';
+    hubject_code?: string | null;
+    hubject_description?: string | null;
+    /** EVSE the server actually started on (may differ: free-sibling fallback). */
+    evse_id?: string;
   };
 }> {
   return apiFetch(`/emp/remote-start`, {
