@@ -146,3 +146,21 @@ export async function registerRfidCard(
   });
   return { success: res.ok, error: res.data?.error };
 }
+
+// ─── Account ────────────────────────────────────
+/**
+ * Self-service account deletion (App Store 5.1.1(v) / GDPR). The server
+ * soft-deletes: PII anonymized, credit forfeited, stored card revoked.
+ * `confirmEmail` must match the account email — server-side guard.
+ */
+export async function deleteAccount(
+  confirmEmail: string
+): Promise<{ success: boolean; error?: string }> {
+  const res = await apiFetch<{ ok?: boolean; error?: string }>('/account/delete', {
+    method: 'POST',
+    requireAuth: true,
+    body: JSON.stringify({ confirmEmail }),
+  });
+  if (res.ok && res.data?.ok !== false) return { success: true };
+  return { success: false, error: res.data?.error || 'network_error' };
+}

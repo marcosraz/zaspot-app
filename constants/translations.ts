@@ -148,6 +148,18 @@ export interface Translations {
     history: string;
     about: string;
     help: string;
+    deleteAccount: string;
+    deleteAccountTitle: string;
+    deleteAccountIntro: string;
+    deleteAccountBullets: string[];
+    deleteAccountConfirmLabel: string;
+    deleteAccountButton: string;
+    deleteAccountConfirmTitle: string;
+    deleteAccountConfirmMessage: string;
+    deleteAccountEmailMismatch: string;
+    deleteAccountActiveSession: string;
+    deleteAccountError: string;
+    deleteAccountDone: string;
     contact: string;
     version: string;
     logout: string;
@@ -440,6 +452,24 @@ export interface Translations {
   };
 
   // About screen
+  topUpScreen: {
+    title: string;
+    minAmount: string;
+    maxAmount: string;
+    startFailed: string;
+    pendingPayment: string;
+    tryAgain: string;
+    notAuthenticated: string;
+    paidTitle: string;
+    paidWithSavedCard: string;
+    error: string;
+    transferFailed: string;
+    cancelTitle: string;
+    cancelMessage: string;
+    back: string;
+    cancel: string;
+    cancelFailed: string;
+  };
   about: {
     legal: string;
     privacy: string;
@@ -600,6 +630,18 @@ export const translations: Record<Language, Translations> = {
       history: 'Historie nabíjení',
       about: 'O aplikaci',
       help: 'Nápověda',
+      deleteAccount: 'Smazat účet',
+      deleteAccountTitle: 'Smazání účtu',
+      deleteAccountIntro: 'Smazání účtu je trvalé a nelze jej vrátit zpět. Co se stane:',
+      deleteAccountBullets: ['Osobní údaje (jméno, e-mail, telefon) budou anonymizovány', 'Zbývající kredit propadne bez náhrady', 'Uložené platební karty a vozidla budou odstraněny', 'Historie nabíjení zůstane uchována anonymně pro účetní účely (zákonná povinnost)'],
+      deleteAccountConfirmLabel: 'Pro potvrzení zadejte svůj e-mail',
+      deleteAccountButton: 'Trvale smazat účet',
+      deleteAccountConfirmTitle: 'Opravdu smazat účet?',
+      deleteAccountConfirmMessage: 'Tato akce je nevratná. Váš účet a zbývající kredit budou nenávratně odstraněny.',
+      deleteAccountEmailMismatch: 'Zadaný e-mail neodpovídá vašemu účtu.',
+      deleteAccountActiveSession: 'Účet nelze smazat během aktivního nabíjení. Nejprve nabíjení ukončete.',
+      deleteAccountError: 'Smazání se nezdařilo. Zkuste to prosím znovu.',
+      deleteAccountDone: 'Váš účet byl smazán.',
       contact: 'Kontakt',
       version: 'Verze',
       logout: 'Odhlásit se',
@@ -870,6 +912,24 @@ export const translations: Record<Language, Translations> = {
       delete: 'Smazat',
       noTags: 'Žádné RFID karty',
     },
+    topUpScreen: {
+      title: 'Dobít kredit',
+      minAmount: 'Minimální částka',
+      maxAmount: 'Maximální částka',
+      startFailed: 'Platbu se nepodařilo zahájit',
+      pendingPayment: 'Předchozí platba se ještě zpracovává. Počkejte prosím, nebo ji zrušte.',
+      tryAgain: 'Zkuste to prosím znovu.',
+      notAuthenticated: 'Nejste přihlášeni. Přihlaste se prosím znovu.',
+      paidTitle: 'Dobito ✓',
+      paidWithSavedCard: '{amount} Kč bylo zaplaceno uloženou kartou a připsáno na účet.',
+      error: 'Chyba',
+      transferFailed: 'Nepodařilo se vygenerovat platbu.',
+      cancelTitle: 'Zrušit platbu?',
+      cancelMessage: 'Tímto smažete čekající žádost o převod. Tuto akci nelze vrátit zpět.',
+      back: 'Zpět',
+      cancel: 'Zrušit',
+      cancelFailed: 'Zrušení selhalo.',
+    },
     about: {
       legal: 'Právní informace',
       terms: 'Obchodní podmínky',
@@ -1025,6 +1085,18 @@ export const translations: Record<Language, Translations> = {
       history: 'Charging History',
       about: 'About App',
       help: 'Help',
+      deleteAccount: 'Delete account',
+      deleteAccountTitle: 'Delete account',
+      deleteAccountIntro: 'Deleting your account is permanent and cannot be undone. What happens:',
+      deleteAccountBullets: ['Personal data (name, email, phone) will be anonymized', 'Any remaining credit will be forfeited', 'Saved payment cards and vehicles will be removed', 'Charging history is retained anonymously for accounting purposes (legal requirement)'],
+      deleteAccountConfirmLabel: 'Type your email to confirm',
+      deleteAccountButton: 'Permanently delete account',
+      deleteAccountConfirmTitle: 'Really delete account?',
+      deleteAccountConfirmMessage: 'This action is irreversible. Your account and any remaining credit will be permanently removed.',
+      deleteAccountEmailMismatch: 'The email entered does not match your account.',
+      deleteAccountActiveSession: 'The account cannot be deleted during an active charging session. Stop charging first.',
+      deleteAccountError: 'Deletion failed. Please try again.',
+      deleteAccountDone: 'Your account has been deleted.',
       contact: 'Contact',
       version: 'Version',
       logout: 'Log Out',
@@ -1295,6 +1367,24 @@ export const translations: Record<Language, Translations> = {
       delete: 'Delete',
       noTags: 'No RFID cards',
     },
+    topUpScreen: {
+      title: 'Top up credit',
+      minAmount: 'Minimum amount',
+      maxAmount: 'Maximum amount',
+      startFailed: 'Payment could not be started',
+      pendingPayment: 'A previous payment is still being processed. Please wait or cancel it.',
+      tryAgain: 'Please try again.',
+      notAuthenticated: 'You are not signed in. Please sign in again.',
+      paidTitle: 'Topped up ✓',
+      paidWithSavedCard: '{amount} CZK was paid with your saved card and credited to your account.',
+      error: 'Error',
+      transferFailed: 'Could not generate the payment.',
+      cancelTitle: 'Cancel payment?',
+      cancelMessage: 'This removes the pending transfer request. This cannot be undone.',
+      back: 'Back',
+      cancel: 'Cancel',
+      cancelFailed: 'Cancellation failed.',
+    },
     about: {
       legal: 'Legal information',
       terms: 'Terms & conditions',
@@ -1450,6 +1540,18 @@ export const translations: Record<Language, Translations> = {
       history: 'Ladehistorie',
       about: 'Über die App',
       help: 'Hilfe',
+      deleteAccount: 'Konto löschen',
+      deleteAccountTitle: 'Konto löschen',
+      deleteAccountIntro: 'Das Löschen des Kontos ist endgültig und kann nicht rückgängig gemacht werden. Das passiert:',
+      deleteAccountBullets: ['Persönliche Daten (Name, E-Mail, Telefon) werden anonymisiert', 'Verbleibendes Guthaben verfällt ersatzlos', 'Gespeicherte Zahlungskarten und Fahrzeuge werden entfernt', 'Der Ladeverlauf bleibt anonymisiert für Buchhaltungszwecke erhalten (gesetzliche Pflicht)'],
+      deleteAccountConfirmLabel: 'Zur Bestätigung E-Mail eingeben',
+      deleteAccountButton: 'Konto endgültig löschen',
+      deleteAccountConfirmTitle: 'Konto wirklich löschen?',
+      deleteAccountConfirmMessage: 'Diese Aktion ist unwiderruflich. Ihr Konto und verbleibendes Guthaben werden dauerhaft entfernt.',
+      deleteAccountEmailMismatch: 'Die eingegebene E-Mail stimmt nicht mit Ihrem Konto überein.',
+      deleteAccountActiveSession: 'Während eines aktiven Ladevorgangs kann das Konto nicht gelöscht werden. Beenden Sie zuerst das Laden.',
+      deleteAccountError: 'Löschen fehlgeschlagen. Bitte erneut versuchen.',
+      deleteAccountDone: 'Ihr Konto wurde gelöscht.',
       contact: 'Kontakt',
       version: 'Version',
       logout: 'Abmelden',
@@ -1720,6 +1822,24 @@ export const translations: Record<Language, Translations> = {
       delete: 'Löschen',
       noTags: 'Keine RFID-Karten',
     },
+    topUpScreen: {
+      title: 'Guthaben aufladen',
+      minAmount: 'Mindestbetrag',
+      maxAmount: 'Höchstbetrag',
+      startFailed: 'Zahlung konnte nicht gestartet werden',
+      pendingPayment: 'Eine vorherige Zahlung wird noch verarbeitet. Bitte warten oder abbrechen.',
+      tryAgain: 'Bitte erneut versuchen.',
+      notAuthenticated: 'Sie sind nicht angemeldet. Bitte erneut anmelden.',
+      paidTitle: 'Aufgeladen ✓',
+      paidWithSavedCard: '{amount} Kč wurden mit der gespeicherten Karte bezahlt und gutgeschrieben.',
+      error: 'Fehler',
+      transferFailed: 'Zahlung konnte nicht erzeugt werden.',
+      cancelTitle: 'Zahlung abbrechen?',
+      cancelMessage: 'Die wartende Überweisungsanfrage wird gelöscht. Dies kann nicht rückgängig gemacht werden.',
+      back: 'Zurück',
+      cancel: 'Abbrechen',
+      cancelFailed: 'Abbruch fehlgeschlagen.',
+    },
     about: {
       legal: 'Rechtliche Informationen',
       terms: 'AGB (Obchodní podmínky)',
@@ -1875,6 +1995,18 @@ export const translations: Record<Language, Translations> = {
       history: 'Historia ładowania',
       about: 'O aplikacji',
       help: 'Pomoc',
+      deleteAccount: 'Usuń konto',
+      deleteAccountTitle: 'Usunięcie konta',
+      deleteAccountIntro: 'Usunięcie konta jest trwałe i nieodwracalne. Co się stanie:',
+      deleteAccountBullets: ['Dane osobowe (imię, e-mail, telefon) zostaną zanonimizowane', 'Pozostały kredyt przepadnie bez zwrotu', 'Zapisane karty płatnicze i pojazdy zostaną usunięte', 'Historia ładowania pozostanie anonimowo do celów księgowych (wymóg prawny)'],
+      deleteAccountConfirmLabel: 'Wpisz swój e-mail, aby potwierdzić',
+      deleteAccountButton: 'Trwale usuń konto',
+      deleteAccountConfirmTitle: 'Na pewno usunąć konto?',
+      deleteAccountConfirmMessage: 'Ta operacja jest nieodwracalna. Twoje konto i pozostały kredyt zostaną trwale usunięte.',
+      deleteAccountEmailMismatch: 'Podany e-mail nie pasuje do Twojego konta.',
+      deleteAccountActiveSession: 'Nie można usunąć konta podczas aktywnego ładowania. Najpierw zakończ ładowanie.',
+      deleteAccountError: 'Usunięcie nie powiodło się. Spróbuj ponownie.',
+      deleteAccountDone: 'Twoje konto zostało usunięte.',
       contact: 'Kontakt',
       version: 'Wersja',
       logout: 'Wyloguj',
@@ -2144,6 +2276,24 @@ export const translations: Record<Language, Translations> = {
       deleteTitle: 'Usunąć tag RFID?',
       delete: 'Usuń',
       noTags: 'Brak kart RFID',
+    },
+    topUpScreen: {
+      title: 'Doładuj saldo',
+      minAmount: 'Minimalna kwota',
+      maxAmount: 'Maksymalna kwota',
+      startFailed: 'Nie udało się rozpocząć płatności',
+      pendingPayment: 'Poprzednia płatność jest jeszcze przetwarzana. Poczekaj lub ją anuluj.',
+      tryAgain: 'Spróbuj ponownie.',
+      notAuthenticated: 'Nie jesteś zalogowany. Zaloguj się ponownie.',
+      paidTitle: 'Doładowano ✓',
+      paidWithSavedCard: '{amount} Kč zapłacono zapisaną kartą i dodano do konta.',
+      error: 'Błąd',
+      transferFailed: 'Nie udało się wygenerować płatności.',
+      cancelTitle: 'Anulować płatność?',
+      cancelMessage: 'Spowoduje to usunięcie oczekującego zlecenia przelewu. Nie można tego cofnąć.',
+      back: 'Wstecz',
+      cancel: 'Anuluj',
+      cancelFailed: 'Anulowanie nie powiodło się.',
     },
     about: {
       legal: 'Informacje prawne',

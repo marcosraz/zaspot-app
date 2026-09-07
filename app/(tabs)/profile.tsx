@@ -1021,6 +1021,17 @@ export default function ProfileScreen() {
               iconColor="#6366F1"
               onPress={() => router.push('/about')}
             />
+            {isAuthenticated && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <MenuItem
+                  icon="trash"
+                  label={t.profile.deleteAccount}
+                  iconColor={colors.error}
+                  onPress={() => router.push('/delete-account')}
+                />
+              </>
+            )}
           </View>
         </View>
 

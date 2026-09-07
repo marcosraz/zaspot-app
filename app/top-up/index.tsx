@@ -25,6 +25,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredit } from '../../context/CreditContext';
 import { useCurrency } from '../../context/CurrencyContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
 import {
@@ -47,6 +48,8 @@ export default function TopUpScreen() {
   const { colors } = useTheme();
   const { balance, topUp, refreshBalance, paymentPending, clearPaymentPending } = useCredit();
   const { format, currency } = useCurrency();
+  const { t } = useLanguage();
+  const tt = t.topUpScreen;
   const isEur = currency === 'eur';
 
   const [tab, setTab] = useState<Tab>('card');
@@ -101,11 +104,11 @@ export default function TopUpScreen() {
   const handleCard = async (payMethod?: 'GPAY' | 'APAY') => {
     const amount = getAmount();
     if (!amount || amount < MIN_AMOUNT) {
-      Alert.alert('Minimální částka', `Minimum ${MIN_AMOUNT} Kč`);
+      Alert.alert(tt.minAmount, `Minimum ${MIN_AMOUNT} Kč`);
       return;
     }
     if (amount > MAX_AMOUNT) {
-      Alert.alert('Maximální částka', `Maximum ${MAX_AMOUNT} Kč`);
+      Alert.alert(tt.maxAmount, `Maximum ${MAX_AMOUNT} Kč`);
       return;
     }
     setSubmitting(true);
@@ -113,12 +116,14 @@ export default function TopUpScreen() {
     setSubmitting(false);
     if (!result.success) {
       const msg = result.error === 'payment_pending'
-        ? 'Předchozí platba se ještě zpracovává. Počkejte prosím, nebo ji zrušte.'
-        : result.error || 'Zkuste to prosím znovu.';
-      Alert.alert('Platbu se nepodařilo zahájit', msg);
+        ? tt.pendingPayment
+        : result.error === 'Not authenticated' ? tt.notAuthenticated
+        : result.error === 'network_error' ? tt.tryAgain
+        : result.error || tt.tryAgain;
+      Alert.alert(tt.startFailed, msg);
     } else if (result.completed) {
       // Instant saved-card (CIT) capture — no browser, credit is already there.
-      Alert.alert('Dobito ✓', `${amount} Kč bylo zaplaceno uloženou kartou a připsáno na účet.`);
+      Alert.alert(tt.paidTitle, tt.paidWithSavedCard.replace('{amount}', String(amount)));
     } else {
       // Browser payment in flight — the pending banner + balance poll take over.
       await refreshBalance();
@@ -136,11 +141,11 @@ export default function TopUpScreen() {
     const minA = isEur ? 2 : MIN_AMOUNT;
     const maxA = isEur ? 400 : MAX_AMOUNT;
     if (!amount || amount < minA) {
-      Alert.alert('Minimální částka', isEur ? `Minimum ${minA} €` : `Minimum ${minA} Kč`);
+      Alert.alert(tt.minAmount, isEur ? `Minimum ${minA} €` : `Minimum ${minA} Kč`);
       return;
     }
     if (amount > maxA) {
-      Alert.alert('Maximální částka', isEur ? `Maximum ${maxA} €` : `Maximum ${maxA} Kč`);
+      Alert.alert(tt.maxAmount, isEur ? `Maximum ${maxA} €` : `Maximum ${maxA} Kč`);
       return;
     }
     setSubmitting(true);
@@ -150,7 +155,7 @@ export default function TopUpScreen() {
       setBankResult(res.data.transfer);
       reloadPending();
     } else {
-      Alert.alert('Chyba', res.data.error ?? 'Nepodařilo se vygenerovat platbu.');
+      Alert.alert(tt.error, res.data.error ?? tt.transferFailed);
     }
   };
 
@@ -169,12 +174,12 @@ export default function TopUpScreen() {
 
   const handleCancel = (id: string) => {
     Alert.alert(
-      'Zrušit platbu?',
-      'Tímto smažete čekající žádost o převod. Tuto akci nelze vrátit zpět.',
+      tt.cancelTitle,
+      tt.cancelMessage,
       [
-        { text: 'Zpět', style: 'cancel' },
+        { text: tt.back, style: 'cancel' },
         {
-          text: 'Zrušit', style: 'destructive', onPress: async () => {
+          text: tt.cancel, style: 'destructive', onPress: async () => {
             setCancellingId(id);
             const res = await cancelBankTransfer(id);
             setCancellingId(null);
@@ -183,7 +188,7 @@ export default function TopUpScreen() {
               setBankResult(prev => (prev && prev.variable_symbol === pendingList.find(p => p.id === id)?.variable_symbol) ? null : prev);
               reloadPending();
             } else {
-              Alert.alert('Chyba', res.data.error ?? 'Zrušení selhalo.');
+              Alert.alert(tt.error, res.data.error ?? tt.cancelFailed);
             }
           },
         },
@@ -199,7 +204,7 @@ export default function TopUpScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Dobít kredit', headerShown: true }} />
+      <Stack.Screen options={{ title: tt.title, headerShown: true }} />
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['bottom']}>
         <ScrollView
           contentContainerStyle={styles.content}
