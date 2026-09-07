@@ -28,6 +28,8 @@ export interface ChargingStation {
   type: 'AC' | 'DC';
   power_kw: number;
   price_per_kwh: number | null;
+  /** Currency of price_per_kwh; undefined/null = CZK (ZAspot + public DB stations). */
+  price_currency?: string | null;
   available: boolean;
   status: 'operational' | 'maintenance' | 'offline';
   operator: string | null;
@@ -264,6 +266,7 @@ export async function fetchNearbyStationsMixed(
     type: (s.max_power_kw >= 50 ? 'DC' : 'AC') as 'AC' | 'DC',
     power_kw: s.max_power_kw,
     price_per_kwh: s.price_per_kwh,
+    price_currency: s.currency,
     available: s.status === 'available',
     status: (s.status === 'available'
       ? 'operational'

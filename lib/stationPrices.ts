@@ -5,7 +5,8 @@
  *  - ZAspot OCPP stations: live effective price from /api/ocpp/station-prices
  *    (spot + distribution + fees per station tariff, incl. 21% VAT — the
  *    customer-facing price, same as the web charge page; bulk endpoint)
- *  - Hubject roaming stations: price_per_kwh in EUR → × EUR/CZK rate
+ *  - Hubject roaming stations: price_per_kwh in the CPO's currency — EUR is
+ *    converted with the EUR/CZK rate, CZK (ČEZ, innogy, …) is taken as-is
  *    (often null — those sort to the end and are excluded by price filters)
  *  - Public DB stations: their static price_per_kwh (already CZK)
  *
@@ -52,6 +53,13 @@ export async function loadPriceContext(): Promise<PriceContext> {
   return cached;
 }
 
+/** Convert a CPO price to CZK. Unknown currency = EUR (Hubject default). */
+export function toCzk(price: number, currency: string | null | undefined, ctx: PriceContext): number {
+  const cur = (currency ?? 'EUR').toUpperCase();
+  if (cur === 'CZK') return Math.round(price * 100) / 100;
+  return Math.round(price * ctx.eurCzk * 100) / 100;
+}
+
 /**
  * Comparable price in CZK/kWh for any station on the map, or null when the
  * operator publishes no price (common for Hubject entries).
@@ -65,10 +73,12 @@ export function getStationPriceCzk(
     const p = ctx.zaspotPrices[station.external_id];
     if (p) return p.effectivePrice;
   }
-  // Hubject roaming station → EUR price converted
+  // Hubject roaming station → convert only when the CPO prices in EUR.
+  // Czech CPOs (ČEZ, innogy, E.ON) publish CZK — multiplying those by the
+  // EUR rate showed ~25× too high prices in the app.
   if (typeof station.id === 'string' && station.id.startsWith('emp-')) {
     if (station.price_per_kwh != null && station.price_per_kwh > 0) {
-      return Math.round(station.price_per_kwh * ctx.eurCzk * 100) / 100;
+      return toCzk(station.price_per_kwh, station.price_currency, ctx);
     }
     return null;
   }

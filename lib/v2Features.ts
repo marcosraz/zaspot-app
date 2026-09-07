@@ -530,6 +530,8 @@ export interface EmpStation {
   connectors: Array<{ type: string; power_kw: number }>;
   status: 'available' | 'occupied' | 'unknown';
   price_per_kwh: number | null;
+  /** Currency of price_per_kwh as published by the CPO via Hubject ('EUR', 'CZK', …). */
+  currency: string | null;
   /** With group=location: number of charge points at this physical site (else 1). */
   evse_count: number;
   /** All charge points at the site (group=location); empty on older servers. */
@@ -561,6 +563,7 @@ function adaptEmpStation(raw: any): EmpStation {
     connectors,
     status,
     price_per_kwh: typeof raw?.price_per_kwh === 'number' ? raw.price_per_kwh : null,
+    currency: typeof raw?.currency === 'string' && raw.currency ? raw.currency.toUpperCase() : null,
     evse_count: typeof raw?.evse_count === 'number' && raw.evse_count > 0 ? raw.evse_count : 1,
     evses: Array.isArray(raw?.evses)
       ? raw.evses

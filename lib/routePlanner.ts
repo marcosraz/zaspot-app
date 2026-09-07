@@ -214,6 +214,7 @@ export async function planRoute(
           type: (s.max_power_kw >= 50 ? 'DC' : 'AC') as 'AC' | 'DC',
           power_kw: s.max_power_kw,
           price_per_kwh: s.price_per_kwh,
+          price_currency: s.currency,
           available: s.status === 'available',
           status: (s.status === 'available' ? 'operational' : 'offline') as ChargingStation['status'],
           operator: s.operator,

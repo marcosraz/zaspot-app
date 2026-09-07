@@ -228,7 +228,7 @@ export default function EmpStationsScreen() {
                   <Spec icon="flash" label={`${s.max_power_kw} kW`} colors={colors} />
                   <Spec icon="hardware-chip" label={s.connectors.map((c) => c.type).join(', ') || '–'} colors={colors} />
                   {s.price_per_kwh != null && (
-                    <Spec icon="cash" label={`${s.price_per_kwh.toFixed(2)} €/kWh`} colors={colors} highlight />
+                    <Spec icon="cash" label={`${s.price_per_kwh.toFixed(2)} ${s.currency === 'CZK' ? 'Kč' : '€'}/kWh`} colors={colors} highlight />
                   )}
                 </View>
 
@@ -273,7 +273,7 @@ export default function EmpStationsScreen() {
                 <View style={styles.modalPriceItem}>
                   <Text style={[styles.modalPriceLabel, { color: colors.textMuted }]}>Cena operátora</Text>
                   <Text style={[styles.modalPriceValue, { color: Colors.brand.accentGreen }]}>
-                    {selected?.price_per_kwh != null ? `${selected.price_per_kwh.toFixed(2)} €/kWh` : 'dle CDR'}
+                    {selected?.price_per_kwh != null ? `${selected.price_per_kwh.toFixed(2)} ${selected.currency === 'CZK' ? 'Kč' : '€'}/kWh` : 'dle CDR'}
                   </Text>
                 </View>
               </View>
