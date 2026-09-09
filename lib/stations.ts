@@ -102,7 +102,9 @@ export async function fetchOcppStations(): Promise<ChargingStation[]> {
     const chargePoints = json.chargePoints || [];
 
     return chargePoints
-      .filter((cp: any) => cp.locationLat != null && cp.locationLng != null)
+      // isPublic guard mirrors the web charging-map; the API already hides
+      // private sites for non-owners, this is the second line of defence.
+      .filter((cp: any) => cp.locationLat != null && cp.locationLng != null && cp.isPublic !== false)
       .map((cp: any): ChargingStation => {
         const physicalConnectors = (cp.connectors || []).filter(
           (c: any) => c.connectorId !== 0
