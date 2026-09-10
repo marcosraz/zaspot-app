@@ -32,7 +32,7 @@ import {
   fetchActiveEmpSession,
   EmpRoamingSession,
 } from '../../lib/v2Features';
-import { pickEvseForStart, remoteStartErrorMessage } from '../../lib/empRoaming';
+import { pickEvseForStart, describeEvse, remoteStartErrorMessage } from '../../lib/empRoaming';
 
 const SESSION_POLL_MS = 10_000;
 
@@ -57,6 +57,10 @@ export default function EmpStationsScreen() {
   const [selected, setSelected] = useState<EmpStation | null>(null);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Connector the user picked in the start sheet (multi-connector sites). The
+  // plugged-in connector usually reports "occupied", so auto-picking a free one
+  // starts the wrong cable — the user has to choose.
+  const [selectedEvseId, setSelectedEvseId] = useState<string | null>(null);
 
   const refreshSession = useCallback(async () => {
     const res = await fetchActiveEmpSession();
@@ -91,12 +95,14 @@ export default function EmpStationsScreen() {
       if (status === 'granted') {
         try {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          params = { lat: loc.coords.latitude, lng: loc.coords.longitude, radius_km: 50 };
+          params = { lat: loc.coords.latitude, lng: loc.coords.longitude, radius_km: 50, groupByLocation: true };
         } catch {
           // no location → fetch generic list
         }
       }
-      const res = await fetchEmpStations(params);
+      // group=location: one row per site with evses[] → connector picker works and
+      // multi-connector sites no longer appear as duplicate rows.
+      const res = await fetchEmpStations({ ...(params ?? {}), groupByLocation: true });
       if (res.ok && res.data?.success) {
         setStations(res.data.stations);
       } else {
@@ -111,8 +117,15 @@ export default function EmpStationsScreen() {
     if (!selected || starting) return;
     setStarting(true);
     setStartError(null);
-    const picked = pickEvseForStart(selected);
-    const res = await empRemoteStart(picked?.evse_id ?? selected.evse_id);
+    const evses = selected.evses ?? [];
+    const userPicked = evses.length > 1 ? selectedEvseId : null;
+    if (evses.length > 1 && !userPicked) {
+      setStarting(false);
+      setStartError('Vyberte konektor, do kterého je zapojené vaše auto.');
+      return;
+    }
+    const evseId = userPicked ?? pickEvseForStart(selected)?.evse_id ?? selected.evse_id;
+    const res = await empRemoteStart(evseId, { connectorSelected: !!userPicked });
     setStarting(false);
     if (res.ok && res.data?.success) {
       setSelected(null);
@@ -278,6 +291,36 @@ export default function EmpStationsScreen() {
                 </View>
               </View>
 
+              {(selected?.evses?.length ?? 0) > 1 && (
+                <View style={styles.connectorBlock}>
+                  <Text style={[styles.modalPriceLabel, { color: colors.textMuted }]}>
+                    Konektor (kam je zapojené auto)
+                  </Text>
+                  <View style={styles.connectorRow}>
+                    {selected!.evses.map((e) => {
+                      const active = selectedEvseId === e.evse_id;
+                      const idx = e.evse_id.split('*').pop();
+                      return (
+                        <TouchableOpacity
+                          key={e.evse_id}
+                          onPress={() => { setSelectedEvseId(e.evse_id); setStartError(null); }}
+                          style={[
+                            styles.connectorChip,
+                            { borderColor: active ? Colors.brand.accentGreen : colors.borderLight,
+                              backgroundColor: active ? 'rgba(22,163,74,0.12)' : 'transparent' },
+                          ]}
+                        >
+                          <Text style={{ color: active ? Colors.brand.accentGreen : colors.text, fontWeight: '700', fontSize: 13 }}>
+                            #{idx}
+                          </Text>
+                          <Text style={{ color: colors.textMuted, fontSize: 11 }}>{describeEvse(e)}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               <Text style={[styles.modalNote, { color: colors.textMuted }]}>
                 Částka se odečte z vašeho ZAspot kreditu po ukončení nabíjení
                 (cena operátora + malá přirážka za roaming). Minimální kredit: 200 Kč.
@@ -308,7 +351,7 @@ export default function EmpStationsScreen() {
 
               <TouchableOpacity
                 style={styles.cancelButton}
-                onPress={() => setSelected(null)}
+                onPress={() => { setSelected(null); setSelectedEvseId(null); }}
                 disabled={starting}
               >
                 <Text style={[styles.cancelButtonText, { color: colors.textMuted }]}>Zrušit</Text>
@@ -381,6 +424,9 @@ const styles = StyleSheet.create({
   modalPriceLabel: { fontSize: 11, marginBottom: 2 },
   modalPriceValue: { fontSize: 16, fontWeight: '700' },
   modalNote: { fontSize: 12, lineHeight: 17, marginTop: 12 },
+  connectorBlock: { marginTop: 14 },
+  connectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  connectorChip: { borderWidth: 1.5, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minWidth: 96, alignItems: 'center', gap: 2 },
   errorBox: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
     backgroundColor: 'rgba(220,38,38,0.1)', borderRadius: 10, padding: 10, marginTop: 12,

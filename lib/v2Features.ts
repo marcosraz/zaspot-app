@@ -642,7 +642,10 @@ export interface EmpCompletedSession {
 /** Start charging at a foreign (Hubject) station. 402 = balance below the
  *  roaming minimum (min_balance_czk in the response), 409 = a roaming session
  *  is already running. */
-export async function empRemoteStart(evseId: string): Promise<{
+export async function empRemoteStart(
+  evseId: string,
+  opts: { connectorSelected?: boolean } = {}
+): Promise<{
   ok: boolean;
   status: number;
   data: {
@@ -663,7 +666,9 @@ export async function empRemoteStart(evseId: string): Promise<{
   return apiFetch(`/emp/remote-start`, {
     method: 'POST',
     requireAuth: true,
-    body: JSON.stringify({ evseId }),
+    // connectorSelected: the user picked this exact connector (their car is plugged
+    // in there) — the server must NOT swap it for a "free" sibling.
+    body: JSON.stringify({ evseId, connectorSelected: opts.connectorSelected === true }),
   });
 }
 

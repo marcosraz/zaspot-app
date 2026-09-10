@@ -365,20 +365,12 @@ export default function MapScreen() {
   // Mirrors the emp-stations screen flow; on success we hand off to that screen
   // which has the live session banner + stop button.
   const handleRoamingStart = (station: ChargingStation) => {
-    // Prefer a free connector at the site; the card's id is only the top-power EVSE.
-    const picked = pickEvseForStart({ evse_id: String(station.id).replace(/^emp-/, ''), evses: station.emp_evses ?? [] });
-    const evseId = picked?.evse_id ?? String(station.id).replace(/^emp-/, '');
-    const connectorLine = picked ? `\nKonektor: ${describeEvse(picked)}` : '';
-    Alert.alert(
-      'Zahájit nabíjení',
-      `${station.name}${connectorLine}\n\nČástka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.`,
-      [
-        { text: 'Zrušit', style: 'cancel' },
-        {
-          text: 'Nabít',
-          onPress: async () => {
+    const evses = station.emp_evses ?? [];
+    const repId = String(station.id).replace(/^emp-/, '');
+    const note = 'Částka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.';
+    const startOn = async (evseId: string, connectorSelected: boolean) => {
             setEmpStarting(true);
-            const res = await empRemoteStart(evseId);
+            const res = await empRemoteStart(evseId, { connectorSelected });
             setEmpStarting(false);
             if (res.ok && res.data?.success) {
               setSelectedStation(null);
@@ -392,10 +384,36 @@ export default function MapScreen() {
             } else {
               Alert.alert('Chyba', remoteStartErrorMessage(res.data));
             }
-          },
-        },
-      ]
-    );
+    };
+    // Multi-connector site: the user must say which cable their car is on — the
+    // plugged-in connector typically reports "occupied", so auto-picking a free
+    // one would start the wrong cable. Native alerts fit ~3 choices; beyond that
+    // hand off to the roaming screen with its chip picker.
+    if (evses.length > 1 && evses.length <= 3) {
+      Alert.alert(
+        'Zahájit nabíjení',
+        `${station.name}\n\nVyberte konektor, do kterého je zapojené vaše auto.\n\n${note}`,
+        [
+          { text: 'Zrušit', style: 'cancel' },
+          ...evses.map((e) => ({
+            text: `#${e.evse_id.split('*').pop()} · ${describeEvse(e)}`,
+            onPress: () => startOn(e.evse_id, true),
+          })),
+        ]
+      );
+      return;
+    }
+    if (evses.length > 3) {
+      setSelectedStation(null);
+      router.push('/emp-stations');
+      return;
+    }
+    const picked = pickEvseForStart({ evse_id: repId, evses });
+    const evseId = picked?.evse_id ?? repId;
+    Alert.alert('Zahájit nabíjení', `${station.name}\n\n${note}`, [
+      { text: 'Zrušit', style: 'cancel' },
+      { text: 'Nabít', onPress: () => startOn(evseId, false) },
+    ]);
   };
 
   const centerOnLocation = () => {
