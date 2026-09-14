@@ -18,7 +18,7 @@ import {
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import * as Location from 'expo-location';
 import PressableScale from '../../components/ui/PressableScale';
 import { useTheme } from '../../context/ThemeContext';
@@ -33,6 +33,8 @@ import {
   EmpRoamingSession,
 } from '../../lib/v2Features';
 import { pickEvseForStart, describeEvse, remoteStartErrorMessage } from '../../lib/empRoaming';
+import { fetchEmpSessions, EmpReceipt } from '../../lib/v2Features';
+import { formatDbDate } from '../../lib/dates';
 
 const SESSION_POLL_MS = 10_000;
 
@@ -61,6 +63,13 @@ export default function EmpStationsScreen() {
   // plugged-in connector usually reports "occupied", so auto-picking a free one
   // starts the wrong cable — the user has to choose.
   const [selectedEvseId, setSelectedEvseId] = useState<string | null>(null);
+  // Past roaming sessions with what they cost (receipt per row).
+  const [history, setHistory] = useState<EmpReceipt[]>([]);
+  const loadHistory = useCallback(async () => {
+    const res = await fetchEmpSessions();
+    if (res.ok && res.data?.success) setHistory(res.data.sessions.filter((s) => s.status !== 'active'));
+  }, []);
+  useEffect(() => { loadHistory(); }, [loadHistory]);
 
   const refreshSession = useCallback(async () => {
     const res = await fetchActiveEmpSession();
@@ -153,7 +162,17 @@ export default function EmpStationsScreen() {
     if (res.ok && res.data?.success) {
       setSession(null);
       refreshSession();
+      setTimeout(loadHistory, 4000);
     }
+  };
+
+  const RECEIPT_STATUS: Record<EmpReceipt['status'], string> = {
+    billed: 'Zaúčtováno',
+    pending: 'Čeká na vyúčtování',
+    no_price: 'Čeká na cenu operátora',
+    insufficient_credit: 'Čeká na dobití kreditu',
+    active: 'Probíhá',
+    failed: 'Nezdařilo se',
   };
 
   if (loading) return <ActivityIndicator style={{ flex: 1 }} color={Colors.brand.accentGreen} />;
@@ -209,6 +228,36 @@ export default function EmpStationsScreen() {
           </View>
 
           {error && <Text style={{ color: colors.error, padding: 14 }}>{error}</Text>}
+
+          {history.length > 0 && (
+            <View style={{ marginBottom: 6 }}>
+              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>Moje roamingová nabíjení</Text>
+              {history.slice(0, 5).map((h) => (
+                <TouchableOpacity
+                  key={h.id}
+                  style={[styles.historyRow, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}
+                  onPress={() => router.push(`/emp-receipt/${h.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="receipt-outline" size={18} color={Colors.brand.accentGreen} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.historyTitle, { color: colors.text }]} numberOfLines={1}>
+                      {h.stationName || h.evseId}
+                    </Text>
+                    <Text style={[styles.historySub, { color: colors.textMuted }]} numberOfLines={1}>
+                      {h.endedAt ? formatDbDate(h.endedAt, 'cs-CZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' · ' : ''}
+                      {h.energyKwh != null ? `${h.energyKwh.toFixed(2)} kWh · ` : ''}
+                      {RECEIPT_STATUS[h.status]}
+                    </Text>
+                  </View>
+                  <Text style={[styles.historyAmount, { color: h.totalCzk != null ? colors.text : colors.textMuted }]}>
+                    {h.totalCzk != null ? `${h.totalCzk.toFixed(2)} Kč` : '–'}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {stations.map((s, idx) => {
             const startable = s.status === 'available' && !session;
@@ -425,6 +474,11 @@ const styles = StyleSheet.create({
   modalPriceValue: { fontSize: 16, fontWeight: '700' },
   modalNote: { fontSize: 12, lineHeight: 17, marginTop: 12 },
   connectorBlock: { marginTop: 14 },
+  sectionTitle: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8, marginLeft: 4 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 8 },
+  historyTitle: { fontSize: 14, fontWeight: '600' },
+  historySub: { fontSize: 12, marginTop: 2 },
+  historyAmount: { fontSize: 14, fontWeight: '700' },
   connectorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
   connectorChip: { borderWidth: 1.5, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, minWidth: 96, alignItems: 'center', gap: 2 },
   errorBox: {

@@ -77,6 +77,7 @@ function RootLayoutNav() {
         <Stack.Screen name="top-up/index" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="scan/index" options={{ animation: 'slide_from_bottom', headerShown: false }} />
         <Stack.Screen name="emp-stations/index" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="emp-receipt/[sessionId]/index" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="station-reviews/[chargePointId]" options={{ animation: 'slide_from_right' }} />
       </Stack>
     </>

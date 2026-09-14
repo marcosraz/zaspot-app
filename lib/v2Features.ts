@@ -717,3 +717,44 @@ export async function fetchPois(lat: number, lng: number, radiusM = 500) {
     `/pois?lat=${lat}&lng=${lng}&radius=${radiusM}`
   );
 }
+
+// ── eRoaming receipts ──────────────────────────────────────────────────────
+/** Mirrors zaspot/lib/emp-receipt.ts (EmpReceipt). Amounts are CZK. */
+export interface EmpReceipt {
+  id: string;
+  receiptNumber: string;
+  status: 'billed' | 'pending' | 'no_price' | 'insufficient_credit' | 'active' | 'failed';
+  operatorId: string | null;
+  operatorName: string | null;
+  stationName: string | null;
+  evseId: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationMinutes: number | null;
+  energyKwh: number | null;
+  cpoPriceOriginal: number | null;
+  cpoCurrencyOriginal: string | null;
+  cpoPriceCzkKwh: number | null;
+  cpoCostCzk: number | null;
+  markupCzkKwh: number | null;
+  markupCostCzk: number | null;
+  totalCzk: number | null;
+  totalNetCzk: number | null;
+  vatCzk: number | null;
+  billedAt: string | null;
+  creditTransactionId: string | null;
+  hubjectSessionId: string | null;
+  errorCode: string | null;
+}
+
+export async function fetchEmpReceipt(sessionId: string) {
+  return apiFetch<{ success: boolean; receipt?: EmpReceipt; error?: string }>(
+    `/emp/receipt/${sessionId}`,
+    { requireAuth: true }
+  );
+}
+
+/** The user's roaming history (newest first). */
+export async function fetchEmpSessions() {
+  return apiFetch<{ success: boolean; sessions: EmpReceipt[] }>(`/emp/sessions`, { requireAuth: true });
+}

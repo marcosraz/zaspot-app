@@ -50,8 +50,15 @@ export default function WalletHistoryScreen() {
     ({ item }: { item: CreditTransaction }) => {
       const meta = TYPE_META[item.type] ?? TYPE_META.adjustment;
       const positive = item.amount_czk > 0;
+      // eRoaming debits link to their receipt (CPO price + roaming markup split).
+      const roamingId = item.roaming_session_id ?? null;
       return (
-        <View style={[styles.row, { backgroundColor: colors.surface }]}>
+        <TouchableOpacity
+          style={[styles.row, { backgroundColor: colors.surface }]}
+          disabled={!roamingId}
+          activeOpacity={0.7}
+          onPress={roamingId ? () => router.push(`/emp-receipt/${roamingId}`) : undefined}
+        >
           <View
             style={[
               styles.iconWrap,
@@ -90,7 +97,8 @@ export default function WalletHistoryScreen() {
               </Text>
             )}
           </View>
-        </View>
+          {roamingId && <Ionicons name="receipt-outline" size={16} color={Colors.brand.accentGreen} style={{ marginLeft: 8 }} />}
+        </TouchableOpacity>
       );
     },
     [colors, format, l]

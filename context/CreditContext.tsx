@@ -19,6 +19,8 @@ export interface CreditTransaction {
   description: string | null;
   created_at: string;
   status: string;
+  /** eRoaming debits: id of the emp_roaming_sessions row → /emp-receipt/{id} */
+  roaming_session_id?: string | null;
 }
 
 interface CreditContextType {
