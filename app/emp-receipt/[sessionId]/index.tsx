@@ -64,6 +64,12 @@ export default function EmpReceiptScreen() {
   const priceRows = (r: EmpReceipt): Array<[string, string, boolean?]> => [
     [`Cena operátora (${r.operatorName || r.operatorId || 'CPO'})`, perKwh(r.cpoPriceCzkKwh)],
     ['   × energie', czk(r.cpoCostCzk)],
+    ...((r.cpoTimeCostCzk ?? 0) > 0
+      ? ([
+          ['Poplatek za čas (operátor)', `${(r.cpoPriceCzkMin ?? 0).toFixed(2).replace('.', ',')} Kč/min`],
+          [`   × ${r.chargingMinutes ?? 0} min`, czk(r.cpoTimeCostCzk)],
+        ] as Array<[string, string, boolean?]>)
+      : []),
     ['Roamingová přirážka ZAspot', perKwh(r.markupCzkKwh)],
     ['   × energie', czk(r.markupCostCzk)],
     ['Základ daně', czk(r.totalNetCzk)],
@@ -180,7 +186,7 @@ ${rows(r).map(line).join('')}</div>
           </View>
 
           <Text style={[styles.note, { color: colors.textMuted }]}>
-            Cena operátora je jeho veřejný tarif přepočtený na Kč. Roamingová přirážka pokrývá zprostředkování přes síť Hubject. Částky jsou včetně DPH.
+            Cena operátora je jeho veřejný tarif přepočtený na Kč (někteří operátoři účtují navíc poplatek za minutu nabíjení). Roamingová přirážka pokrývá zprostředkování přes síť Hubject. Částky jsou včetně DPH.
           </Text>
 
           <TouchableOpacity

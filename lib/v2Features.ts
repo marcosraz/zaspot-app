@@ -736,6 +736,9 @@ export interface EmpReceipt {
   cpoCurrencyOriginal: string | null;
   cpoPriceCzkKwh: number | null;
   cpoCostCzk: number | null;
+  cpoPriceCzkMin: number | null;
+  chargingMinutes: number | null;
+  cpoTimeCostCzk: number | null;
   markupCzkKwh: number | null;
   markupCostCzk: number | null;
   totalCzk: number | null;
