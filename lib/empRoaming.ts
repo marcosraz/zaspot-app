@@ -47,7 +47,9 @@ function shortPlug(p: string): string {
 /** Czech error text for a failed empRemoteStart() (non-402/409 case). */
 export function remoteStartErrorMessage(data: { reason?: string; hubject_code?: string | null } | undefined): string {
   if (data?.reason === 'emp_not_activated') {
-    return 'Roaming se pro ZAspot u Hubject teprve aktivuje. Zkuste to prosím později, o zprovoznění vás budeme informovat.';
+    // Hubject code 210 is returned by the CPO's backend: our EMP subscription
+    // exists, but the operator has not yet created CZ-ZAS in their system.
+    return 'Tento operátor zatím nemá ZAspot ve svém systému aktivovaný (nové partnerství, aktivace probíhá). Zkuste jinou stanici nebo to zopakujte za pár dní.';
   }
   if (data?.reason === 'hubject_rejected') {
     return `Roamingová platforma požadavek odmítla (kód ${data.hubject_code ?? '?'}). Zkuste to znovu nebo vyberte jinou stanici.`;
