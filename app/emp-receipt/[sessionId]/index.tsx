@@ -100,7 +100,7 @@ export default function EmpReceiptScreen() {
 <div class="station-id">${r.operatorName || r.operatorId || ''} · ${r.evseId} · síť Hubject</div>
 ${rows(r).map(line).join('')}</div>
 <div class="card">${priceRows(r).map(line).join('')}</div>
-<div class="footer">Zprostředkovatel roamingu: Sdil Building Automotive s.r.o. (ZAspot) · IČO 09873236 · DIČ CZ09873236<br/>
+<div class="footer">Zprostředkovatel roamingu: ${r.zaspotInvoiceName ?? 'Zaspot SBA'} · IČO 09873236 · DIČ CZ09873236<br/>
 Štefánikova 605/46b, 612 00 Brno · zaspot.cz · Hubject session ${r.hubjectSessionId ?? ''}</div>
 </body></html>`;
   };

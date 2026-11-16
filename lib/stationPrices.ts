@@ -77,8 +77,14 @@ export function getStationPriceCzk(
   // Czech CPOs (ČEZ, innogy, E.ON) publish CZK — multiplying those by the
   // EUR rate showed ~25× too high prices in the app.
   if (typeof station.id === 'string' && station.id.startsWith('emp-')) {
+    // Server converts every currency (PLN, DKK, SEK, …) — use that when present.
+    if (station.price_czk_kwh != null && station.price_czk_kwh > 0) return station.price_czk_kwh;
     if (station.price_per_kwh != null && station.price_per_kwh > 0) {
-      return toCzk(station.price_per_kwh, station.price_currency, ctx);
+      const cur = (station.price_currency ?? 'EUR').toUpperCase();
+      // Only EUR/CZK can be converted locally; anything else without a server
+      // value is unknown rather than a wrong number.
+      if (cur !== 'EUR' && cur !== 'CZK') return null;
+      return toCzk(station.price_per_kwh, cur, ctx);
     }
     return null;
   }

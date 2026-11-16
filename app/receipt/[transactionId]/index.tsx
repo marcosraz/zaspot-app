@@ -34,6 +34,8 @@ import { formatDbDate, formatDbTime } from '../../../lib/dates';
 
 interface ReceiptData {
   id: string;
+  /** ZAspot company name for the footer, configured at /admin/letterheads */
+  zaspotInvoiceName?: string;
   transactionId: number;
   stationName: string;
   stationIdentity: string;
@@ -155,7 +157,7 @@ export default function ReceiptScreen() {
   </div>
 
   <div class="footer">
-    Sdil Building Automotive s.r.o. · IČO 09873236 · DIČ CZ09873236<br/>
+    ${r.zaspotInvoiceName ?? 'Zaspot SBA'} · IČO 09873236 · DIČ CZ09873236<br/>
     Štefánikova 605/46b, 612 00 Brno · zaspot.cz
   </div>
 </body>

@@ -530,8 +530,10 @@ export interface EmpStation {
   connectors: Array<{ type: string; power_kw: number }>;
   status: 'available' | 'occupied' | 'unknown';
   price_per_kwh: number | null;
-  /** Currency of price_per_kwh as published by the CPO via Hubject ('EUR', 'CZK', …). */
+  /** Currency of price_per_kwh as published by the CPO via Hubject ('EUR', 'CZK', 'PLN', …). */
   currency: string | null;
+  /** Server-side CZK conversion of price_per_kwh (all currencies). */
+  price_czk_kwh: number | null;
   /** With group=location: number of charge points at this physical site (else 1). */
   evse_count: number;
   /** All charge points at the site (group=location); empty on older servers. */
@@ -564,6 +566,7 @@ function adaptEmpStation(raw: any): EmpStation {
     status,
     price_per_kwh: typeof raw?.price_per_kwh === 'number' ? raw.price_per_kwh : null,
     currency: typeof raw?.currency === 'string' && raw.currency ? raw.currency.toUpperCase() : null,
+    price_czk_kwh: typeof raw?.price_czk_kwh === 'number' ? raw.price_czk_kwh : null,
     evse_count: typeof raw?.evse_count === 'number' && raw.evse_count > 0 ? raw.evse_count : 1,
     evses: Array.isArray(raw?.evses)
       ? raw.evses
@@ -722,6 +725,8 @@ export async function fetchPois(lat: number, lng: number, radiusM = 500) {
 /** Mirrors zaspot/lib/emp-receipt.ts (EmpReceipt). Amounts are CZK. */
 export interface EmpReceipt {
   id: string;
+  /** ZAspot company name for the footer, configured at /admin/letterheads */
+  zaspotInvoiceName?: string;
   receiptNumber: string;
   status: 'billed' | 'pending' | 'no_price' | 'insufficient_credit' | 'active' | 'failed';
   operatorId: string | null;

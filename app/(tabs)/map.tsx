@@ -163,6 +163,7 @@ export default function MapScreen() {
     power_kw: s.max_power_kw,
     price_per_kwh: s.price_per_kwh,
     price_currency: s.currency,
+    price_czk_kwh: s.price_czk_kwh,
     available: s.status === 'available',
     status: s.status === 'available' ? 'operational' : 'offline',
     operator: s.operator,

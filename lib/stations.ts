@@ -30,6 +30,8 @@ export interface ChargingStation {
   price_per_kwh: number | null;
   /** Currency of price_per_kwh; undefined/null = CZK (ZAspot + public DB stations). */
   price_currency?: string | null;
+  /** Server-converted CZK price (Hubject stations); preferred over local FX math. */
+  price_czk_kwh?: number | null;
   available: boolean;
   status: 'operational' | 'maintenance' | 'offline';
   operator: string | null;
@@ -269,6 +271,7 @@ export async function fetchNearbyStationsMixed(
     power_kw: s.max_power_kw,
     price_per_kwh: s.price_per_kwh,
     price_currency: s.currency,
+    price_czk_kwh: s.price_czk_kwh,
     available: s.status === 'available',
     status: (s.status === 'available'
       ? 'operational'
