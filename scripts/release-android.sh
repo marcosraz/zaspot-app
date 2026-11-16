@@ -21,7 +21,7 @@ SRC="$(cd "$(dirname "$0")/.." && pwd)"
 SITE="https://www.zaspot.cz"
 SSH_HOST="zaspot@46.225.71.186"
 SSH_OPTS=(-i "$HOME/.ssh/hetzner_zaspot" -o BatchMode=yes -o ConnectTimeout=20)
-REMOTE_DIR="/app/public/storage/downloads"
+REMOTE_DIR="${REMOTE_DIR:-/app/public/storage/downloads}"   # überschreibbar zum Testen
 EXPECTED_PKG="cz.zaspot.app"
 
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}"
