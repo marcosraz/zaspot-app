@@ -612,7 +612,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      {/* ── Floating header: row 1 = search + filter, row 2 = network toggle + count.
+      {/* ── Floating header: row 1 = search + filter, row 2 = network toggle (incl. count) + cheapest chip.
           Everything lives inside ONE SafeAreaView so the notch/status-bar inset is
           applied a single time and the rows stack deterministically. The old layout
           positioned the toggle (top:110) and count badge (top:115) with absolute
@@ -675,7 +675,10 @@ export default function MapScreen() {
         )}
 
         <View style={styles.controlsRow} pointerEvents="box-none">
-          {/* Network Filter Toggle (matches web charging-map) */}
+          {/* Network Filter Toggle (matches web charging-map). The active segment
+              carries the number of stations currently shown. That number used to
+              live in a separate "N all stations" badge, which pushed the
+              "Nejlevnější" chip off-screen on ~360dp-wide phones. */}
           <View style={[styles.networkToggle, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
               style={[
@@ -689,8 +692,9 @@ export default function MapScreen() {
                   styles.networkToggleText,
                   { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
                 ]}
+                numberOfLines={1}
               >
-                ZAspot ({ocppStations.length})
+                ZAspot{networkFilter === 'zaspot' ? ` (${filteredStations.length})` : ''}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -705,18 +709,11 @@ export default function MapScreen() {
                   styles.networkToggleText,
                   { color: networkFilter === 'all' ? '#fff' : colors.text },
                 ]}
+                numberOfLines={1}
               >
-                Vše
+                Vše{networkFilter === 'all' ? ` (${filteredStations.length})` : ''}
               </Text>
             </TouchableOpacity>
-          </View>
-
-          {/* Station Count Badge */}
-          <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
-            <Ionicons name="location" size={16} color={Colors.brand.accentGreen} />
-            <Text style={[styles.countText, { color: colors.text }]}>
-              {filteredStations.length} {t.map.allStations.toLowerCase()}
-            </Text>
           </View>
 
           {/* Cheapest-nearby list */}
@@ -727,7 +724,7 @@ export default function MapScreen() {
             accessibilityLabel="Nejlevnější stanice v okolí"
           >
             <Ionicons name="cash-outline" size={16} color={Colors.brand.accentGreen} />
-            <Text style={[styles.countText, { color: colors.text }]}>Nejlevnější</Text>
+            <Text style={[styles.countText, { color: colors.text }]} numberOfLines={1}>Nejlevnější</Text>
           </TouchableOpacity>
         </View>
 
@@ -1311,8 +1308,13 @@ const styles = StyleSheet.create({
   },
   controlsRow: {
     flexDirection: 'row',
+    // Safety net: with a large system font scale the chips wrap onto a second
+    // line instead of being clipped at the screen edge.
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    columnGap: 8,
+    rowGap: 8,
   },
   searchBar: {
     flex: 1,
@@ -1363,19 +1365,9 @@ const styles = StyleSheet.create({
   networkToggleText: {
     fontSize: 12,
     fontWeight: '700',
-  },
-  countBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 6,
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    // Equal-width digits: the count changes while panning in "Vše" mode and
+    // would otherwise make the toggle's width jitter.
+    fontVariant: ['tabular-nums'],
   },
   countText: {
     fontSize: 13,
