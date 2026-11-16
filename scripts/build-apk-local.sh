@@ -16,17 +16,6 @@ export ORG_GRADLE_PROJECT_reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86
 SRC=/Users/mara/Websites/zaspot/zaspot-app
 WORK=/tmp/zaspot-bcr-build
 
-echo "=== [0/6] Nativen Fingerabdruck festhalten (Sicherung für scripts/ota-update.sh)"
-# Gehört zum Release-Commit: ota-update.sh vergleicht später dagegen und
-# verweigert ein OTA-Update, wenn sich seit diesem Build Natives geändert hat.
-(cd "$SRC" && npx --no-install @expo/fingerprint fingerprint:generate 2>/dev/null | python3 -c "
-import json, re, sys
-h = json.load(sys.stdin)['hash']
-v = re.search(r\"^\s*version: '([^']+)'\", open('app.config.ts').read(), re.M).group(1)
-open('native-fingerprint.json', 'w').write(json.dumps({'version': v, 'hash': h}, indent=2) + '\n')
-print('  ', v, h)
-") || echo "  ⚠️  Fingerabdruck nicht berechenbar — ota-update.sh bricht dann später ab"
-
 echo "=== [1/6] Frische Projektkopie nach $WORK"
 rm -rf "$WORK"
 mkdir -p "$WORK"
@@ -36,6 +25,19 @@ rsync -a --exclude node_modules --exclude .git --exclude android --exclude ios \
 cd "$WORK"
 echo "=== [2/6] npm ci"
 npm ci --no-audit --no-fund > /tmp/zaspot_bcr_npm.log 2>&1 || { echo "npm ci FAILED"; tail -20 /tmp/zaspot_bcr_npm.log; exit 1; }
+
+echo "=== [2b] Nativen Fingerabdruck festhalten (Sicherung für scripts/ota-update.sh)"
+# Im sauberen npm-ci-Stand und VOR dem Prebuild berechnet: ota-update.sh rechnet
+# unter exakt denselben Bedingungen nach und verweigert ein OTA-Update, wenn
+# sich seit diesem Build Natives geändert hat. Die Datei gehört zum Release-Commit.
+FP_HASH=$(npx --no-install @expo/fingerprint fingerprint:generate 2>/dev/null | python3 -c "import json,sys; print(json.load(sys.stdin)['hash'])" || true)
+FP_VERSION=$(sed -n "s/^ *version: '\([^']*\)'.*/\1/p" app.config.ts | head -1)
+if [ -n "$FP_HASH" ]; then
+  printf '{\n  "version": "%s",\n  "hash": "%s"\n}\n' "$FP_VERSION" "$FP_HASH" > "$SRC/native-fingerprint.json"
+  echo "  $FP_VERSION $FP_HASH"
+else
+  echo "  ⚠️  Fingerabdruck nicht berechenbar — ota-update.sh bricht dann später ab"
+fi
 
 echo "=== [3/6] expo prebuild (android)"
 npx expo prebuild --platform android --no-install > /tmp/zaspot_bcr_prebuild.log 2>&1 || { echo "prebuild FAILED"; tail -20 /tmp/zaspot_bcr_prebuild.log; exit 1; }
