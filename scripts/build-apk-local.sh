@@ -16,6 +16,17 @@ export ORG_GRADLE_PROJECT_reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86
 SRC=/Users/mara/Websites/zaspot/zaspot-app
 WORK=/tmp/zaspot-bcr-build
 
+echo "=== [0/6] Nativen Fingerabdruck festhalten (Sicherung für scripts/ota-update.sh)"
+# Gehört zum Release-Commit: ota-update.sh vergleicht später dagegen und
+# verweigert ein OTA-Update, wenn sich seit diesem Build Natives geändert hat.
+(cd "$SRC" && npx --no-install @expo/fingerprint fingerprint:generate 2>/dev/null | python3 -c "
+import json, re, sys
+h = json.load(sys.stdin)['hash']
+v = re.search(r\"^\s*version: '([^']+)'\", open('app.config.ts').read(), re.M).group(1)
+open('native-fingerprint.json', 'w').write(json.dumps({'version': v, 'hash': h}, indent=2) + '\n')
+print('  ', v, h)
+") || echo "  ⚠️  Fingerabdruck nicht berechenbar — ota-update.sh bricht dann später ab"
+
 echo "=== [1/6] Frische Projektkopie nach $WORK"
 rm -rf "$WORK"
 mkdir -p "$WORK"

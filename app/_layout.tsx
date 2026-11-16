@@ -20,6 +20,7 @@ import { VehicleProvider } from '../context/VehicleContext';
 import { NotificationsProvider } from '../context/NotificationsContext';
 import { ShopProvider } from '../context/ShopContext';
 import AnimatedSplash from '../components/AnimatedSplash';
+import { useOtaUpdateFetch } from '../lib/otaUpdates';
 
 // Keep the native splash screen visible while we load resources
 SplashScreen.preventAutoHideAsync();
@@ -87,6 +88,8 @@ function RootLayoutNav() {
 function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [appIsReady, setAppIsReady] = useState(false);
+
+  useOtaUpdateFetch();
 
   useEffect(() => {
     async function prepare() {

@@ -12,6 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
 import { Layout } from '../../constants/layout';
+import { getOtaUpdateLabel } from '../../lib/otaUpdates';
 
 const COMPANY = {
   name: 'Sdil Building Automotive s.r.o.',
@@ -27,6 +28,7 @@ export default function AboutScreen() {
   const { t } = useLanguage();
 
   const version = Constants.expoConfig?.version ?? '—';
+  const otaLabel = getOtaUpdateLabel();
 
   const LINKS: { icon: keyof typeof Ionicons.glyphMap; label: string; url: string }[] = [
     { icon: 'globe-outline', label: t.about.website, url: 'https://www.zaspot.cz' },
@@ -51,6 +53,9 @@ export default function AboutScreen() {
             <Text style={[styles.version, { color: colors.textMuted }]}>
               {t.profile.version} {version}
             </Text>
+            {otaLabel && (
+              <Text style={[styles.otaLabel, { color: colors.textMuted }]}>{otaLabel}</Text>
+            )}
           </View>
 
           {/* Links */}
@@ -101,6 +106,7 @@ const styles = StyleSheet.create({
   logo: { width: 72, height: 72, borderRadius: 18 },
   appName: { fontSize: 22, fontWeight: '800', marginTop: 8 },
   version: { fontSize: 13 },
+  otaLabel: { fontSize: 11, marginTop: 2 },
   card: { borderRadius: 14, padding: 16 },
   divider: { height: StyleSheet.hairlineWidth },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },

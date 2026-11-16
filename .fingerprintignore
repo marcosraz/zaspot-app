@@ -1,0 +1,5 @@
+# Wird nur von der OTA-Sicherung in scripts/ota-update.sh genutzt (die Runtime-
+# Version ist die App-Version, nicht der Fingerabdruck). Diese Dateien ändern
+# nichts am nativen Projekt und sollen kein "neuer Build nötig" auslösen.
+eas.json
+.gitignore

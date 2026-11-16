@@ -4,12 +4,24 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'ZAspot',
   slug: 'zaspot-app',
-  version: '2.1.12',
+  version: '2.1.13',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   scheme: 'zaspot',
+  // OTA updates (EAS Update): JS-only fixes reach installed apps without a new
+  // APK / TestFlight build. Publish with scripts/ota-update.sh.
+  updates: {
+    url: 'https://u.expo.dev/5fde0a0a-a4f2-4abc-8023-245acefc126b',
+    // EAS Build injects the channel from eas.json, but the Android APK is built
+    // locally (scripts/build-apk-local.sh) — so it has to be declared here.
+    requestHeaders: { 'expo-channel-name': 'production' },
+  },
+  // Runtime = app version: an update only reaches builds with the same
+  // `version`. Rule: bump `version` <=> new native build; JS-only fixes go out
+  // as an OTA update WITHOUT bumping it.
+  runtimeVersion: { policy: 'appVersion' },
   splash: {
     image: './assets/splash-icon.png',
     resizeMode: 'contain',
@@ -43,7 +55,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     edgeToEdgeEnabled: true,
     package: 'cz.zaspot.app',
-    versionCode: 13,
+    versionCode: 14,
     permissions: [
       'android.permission.ACCESS_COARSE_LOCATION',
       'android.permission.ACCESS_FINE_LOCATION',
