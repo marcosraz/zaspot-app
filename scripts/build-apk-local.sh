@@ -75,4 +75,25 @@ else
 fi
 
 ls -lh "$OUT"
+
+# Optional: App Bundle für Google Play (Play nimmt für neue Apps nur .aab an).
+# Nutzt die bereits kompilierten Natives aus Pass 2 → dauert nur Sekunden.
+if [ "${1:-}" = "--aab" ]; then
+  echo "=== [AAB] bundleRelease + mit EAS-Keystore signieren"
+  ./gradlew :app:bundleRelease -x lint > /tmp/zaspot_bcr_aab.log 2>&1 || { echo "bundleRelease FAILED"; tail -30 /tmp/zaspot_bcr_aab.log; exit 1; }
+  AAB_OUT="$HOME/Downloads/zaspot-app-$ts.aab"
+  cp "$WORK/android/app/build/outputs/bundle/release/app-release.aab" "$AAB_OUT"
+  if [ -f "$CREDS" ] && [ -f "$KS" ]; then
+    # Gradle signiert mit dem Debug-Key (Expo-Prebuild-Default) — der muss raus,
+    # sonst hat das Bundle zwei Signierer und Play lehnt es ab.
+    zip -q -d "$AAB_OUT" 'META-INF/*.SF' 'META-INF/*.RSA' 'META-INF/*.DSA' 'META-INF/*.EC' 'META-INF/MANIFEST.MF' > /dev/null 2>&1 || true
+    KS_PASS="$SPASS" KEY_PASS="$KPASS" jarsigner -keystore "$KS" -storepass:env KS_PASS -keypass:env KEY_PASS \
+      -sigalg SHA256withRSA -digestalg SHA-256 "$AAB_OUT" "$ALIAS" > /dev/null
+    jarsigner -verify "$AAB_OUT" | grep -q "jar verified" && echo "  AAB signiert ✓" || { echo "  AAB-Signatur NICHT verifiziert"; exit 1; }
+  else
+    echo "  ⚠️  Keystore fehlt — AAB bleibt debug-signiert (Play lehnt das ab)"
+  fi
+  ls -lh "$AAB_OUT"
+fi
+
 echo "DONE: $OUT"
