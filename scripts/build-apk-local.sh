@@ -42,6 +42,10 @@ npx expo prebuild --platform android --no-install > /tmp/zaspot_bcr_prebuild.log
 
 cd android
 echo "=== [4/6] Gradle Pass 1 (erwarteter Fail bei reanimated/libworklets)"
+# Frischer Daemon: ein von früheren Builds wiederverwendeter Daemon lief am
+# 16.11.2026 in "out of JVM Metaspace" und ließ mitten im Build wahllos Tasks
+# scheitern (ohne Fehlertext) — kostet ~10 s, spart einen 20-Minuten-Fehlversuch.
+./gradlew --stop > /dev/null 2>&1 || true
 ./gradlew :app:assembleRelease -x lint > /tmp/zaspot_bcr_pass1.log 2>&1 || true
 tail -3 /tmp/zaspot_bcr_pass1.log
 
