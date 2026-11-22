@@ -608,9 +608,11 @@ export async function fetchEmpStations(params?: {
   if (params?.radius_km != null) qs.set('radius', String(params.radius_km));
   qs.set('limit', String(params?.limit ?? 300));
   const q = qs.toString();
+  // No auth: /api/emp/stations is a public listing (the web map calls it
+  // logged-out). With requireAuth the app short-circuited to 401 for guests, so
+  // they saw no roaming stations at all — fatal now that "all" is the map default.
   const res = await apiFetch<{ success: boolean; stations: any[] }>(
-    `/emp/stations${q ? '?' + q : ''}`,
-    { requireAuth: true }
+    `/emp/stations${q ? '?' + q : ''}`
   );
   const stations = res.ok && Array.isArray(res.data?.stations)
     ? res.data.stations.map(adaptEmpStation)

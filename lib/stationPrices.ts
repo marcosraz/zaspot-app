@@ -8,7 +8,8 @@
  *  - Hubject roaming stations: price_per_kwh in the CPO's currency — EUR is
  *    converted with the EUR/CZK rate, CZK (ČEZ, innogy, …) is taken as-is
  *    (often null — those sort to the end and are excluded by price filters)
- *  - Public DB stations: their static price_per_kwh (already CZK)
+ *  - Public directory stations: no price (the stored values are stale EUR
+ *    seed data, not CZK — see getStationPriceCzk)
  *
  * The "cheapest nearby" list and the max-price filter both rely on this.
  */
@@ -88,10 +89,9 @@ export function getStationPriceCzk(
     }
     return null;
   }
-  // Public DB station → static CZK price as stored
-  if (station.price_per_kwh != null && station.price_per_kwh > 0) {
-    return station.price_per_kwh;
-  }
+  // Public directory station → no usable price. The only priced rows there are
+  // 2025 seed values in EUR (0.25–0.79); read as CZK they put e.g. a Tesla
+  // Supercharger at "0.45 Kč" on top of every "cheapest nearby" list.
   return null;
 }
 

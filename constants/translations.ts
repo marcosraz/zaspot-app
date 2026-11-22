@@ -57,6 +57,7 @@ export interface Translations {
     connectorType: string;
     resetFilters: string;
     allTypes: string;
+    onlyZaspot: string;
   };
 
   // Spot prices screen
@@ -547,6 +548,7 @@ export const translations: Record<Language, Translations> = {
       connectorType: 'Typ konektoru',
       resetFilters: 'Resetovat filtry',
       allTypes: 'Vše',
+      onlyZaspot: 'Jen ZAspot',
     },
     spotPrices: {
       title: 'Spotové ceny elektřiny',
@@ -1002,6 +1004,7 @@ export const translations: Record<Language, Translations> = {
       connectorType: 'Connector type',
       resetFilters: 'Reset filters',
       allTypes: 'All',
+      onlyZaspot: 'ZAspot only',
     },
     spotPrices: {
       title: 'Electricity Spot Prices',
@@ -1457,6 +1460,7 @@ export const translations: Record<Language, Translations> = {
       connectorType: 'Anschlusstyp',
       resetFilters: 'Filter zurücksetzen',
       allTypes: 'Alle',
+      onlyZaspot: 'Nur ZAspot',
     },
     spotPrices: {
       title: 'Stromspotpreise',
@@ -1912,6 +1916,7 @@ export const translations: Record<Language, Translations> = {
       connectorType: 'Typ złącza',
       resetFilters: 'Resetuj filtry',
       allTypes: 'Wszystko',
+      onlyZaspot: 'Tylko ZAspot',
     },
     spotPrices: {
       title: 'Ceny spot energii',

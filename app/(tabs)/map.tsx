@@ -66,10 +66,12 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [stations, setStations] = useState<ChargingStation[]>([]);
   const [ocppStations, setOcppStations] = useState<ChargingStation[]>([]);
-  // Hubject roaming stations — loaded lazily when user toggles "Vše"
+  // Hubject roaming stations — loaded per map viewport (see loadEmpForBounds)
   const [empStations, setEmpStations] = useState<ChargingStation[]>([]);
   const [empLoading, setEmpLoading] = useState(false);
-  const [networkFilter, setNetworkFilter] = useState<'zaspot' | 'all'>('zaspot');
+  // Default 'all': the map opens with every station nearby (ZAspot + Hubject
+  // roaming + public directory). 'zaspot' is the opt-in "Jen ZAspot" checkbox.
+  const [networkFilter, setNetworkFilter] = useState<'zaspot' | 'all'>('all');
   const [isOffline, setIsOffline] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -227,17 +229,20 @@ export default function MapScreen() {
     };
   }, []);
 
-  // Switching to 'Vše' → ask Leaflet for its current viewport to trigger the
-  // first roaming fetch (and seed a wide CZ box as fallback while zoomed out)
+  // 'all' is the default, so this runs on mount (before Leaflet exists) and
+  // again once the map reports 'loaded' — only then can requestBounds() answer
+  // with the real viewport. Also seeds a wide CZ box while zoomed out.
   useEffect(() => {
     if (networkFilter !== 'all') return;
-    webViewRef.current?.injectJavaScript('window.requestBounds && window.requestBounds(); true;');
+    if (mapStatus === 'loaded') {
+      webViewRef.current?.injectJavaScript('window.requestBounds && window.requestBounds(); true;');
+    }
     if (empCacheRef.current.size === 0) {
-      // CZ-wide seed: grouped + limit 2500 ≥ all ~2,253 CZ locations → the
-      // whole country is on the map even before the first zoom-in.
+      // CZ-wide seed (grouped, limit 2500, strongest chargers first) so the
+      // country is populated even before the first zoom-in.
       loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 });
     }
-  }, [networkFilter, loadEmpForBounds]);
+  }, [networkFilter, mapStatus, loadEmpForBounds]);
 
   const hasActiveFilters = filters.dcOnly || filters.acOnly || filters.availableOnly
     || filters.favoritesOnly || filters.freeParking || filters.connectorType !== null
@@ -255,8 +260,8 @@ export default function MapScreen() {
   });
 
   // Combine stations based on network filter
-  // 'zaspot' = only ZAspot-owned OCPP stations (default)
-  // 'all'    = ZAspot + Hubject roaming + public DB, dedup by id
+  // 'all'    = ZAspot + Hubject roaming + public DB, dedup by id (default)
+  // 'zaspot' = only ZAspot-owned OCPP stations ("Jen ZAspot" ticked)
   const allStations = React.useMemo(() => {
     if (networkFilter === 'zaspot') return ocppStations;
     const seen = new Set(ocppStations.map((s) => s.id));
@@ -376,6 +381,13 @@ export default function MapScreen() {
             if (res.ok && res.data?.success) {
               setSelectedStation(null);
               router.push('/emp-stations');
+            } else if (res.status === 401) {
+              // Guests see roaming stations too (the list is public) — starting
+              // a charge is what needs an account.
+              Alert.alert('Přihlášení', 'Pro zahájení nabíjení se prosím přihlaste.', [
+                { text: 'Zrušit', style: 'cancel' },
+                { text: 'Přihlásit se', onPress: () => router.push('/(auth)/login') },
+              ]);
             } else if (res.status === 402) {
               const min = res.data?.min_balance_czk ?? 200;
               Alert.alert('Nedostatečný kredit', `Pro roaming je potřeba alespoň ${min} Kč.`);
@@ -675,46 +687,37 @@ export default function MapScreen() {
         )}
 
         <View style={styles.controlsRow} pointerEvents="box-none">
-          {/* Network Filter Toggle (matches web charging-map). The active segment
-              carries the number of stations currently shown. That number used to
-              live in a separate "N all stations" badge, which pushed the
+          {/* "Jen ZAspot" checkbox (matches web charging-map). Unticked = every
+              station nearby incl. Hubject roaming — the default. The count is
+              how many ZAspot stations ticking it leaves on the map; it lives
+              inside the chip because a separate count badge pushed the
               "Nejlevnější" chip off-screen on ~360dp-wide phones. */}
-          <View style={[styles.networkToggle, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity
+          <TouchableOpacity
+            style={[
+              styles.networkToggle,
+              styles.onlyZaspotChip,
+              { backgroundColor: networkFilter === 'zaspot' ? Colors.brand.accentGreen : colors.surface },
+            ]}
+            onPress={() => setNetworkFilter(networkFilter === 'zaspot' ? 'all' : 'zaspot')}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: networkFilter === 'zaspot' }}
+            accessibilityLabel={t.map.onlyZaspot}
+          >
+            <Ionicons
+              name={networkFilter === 'zaspot' ? 'checkbox' : 'square-outline'}
+              size={18}
+              color={networkFilter === 'zaspot' ? '#fff' : colors.textSecondary}
+            />
+            <Text
               style={[
-                styles.networkToggleBtn,
-                networkFilter === 'zaspot' && { backgroundColor: Colors.brand.accentGreen },
+                styles.networkToggleText,
+                { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
               ]}
-              onPress={() => setNetworkFilter('zaspot')}
+              numberOfLines={1}
             >
-              <Text
-                style={[
-                  styles.networkToggleText,
-                  { color: networkFilter === 'zaspot' ? '#fff' : colors.text },
-                ]}
-                numberOfLines={1}
-              >
-                ZAspot{networkFilter === 'zaspot' ? ` (${filteredStations.length})` : ''}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.networkToggleBtn,
-                networkFilter === 'all' && { backgroundColor: Colors.brand.accentGreen },
-              ]}
-              onPress={() => setNetworkFilter('all')}
-            >
-              <Text
-                style={[
-                  styles.networkToggleText,
-                  { color: networkFilter === 'all' ? '#fff' : colors.text },
-                ]}
-                numberOfLines={1}
-              >
-                Vše{networkFilter === 'all' ? ` (${filteredStations.length})` : ''}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              {t.map.onlyZaspot} ({networkFilter === 'zaspot' ? filteredStations.length : ocppStations.length})
+            </Text>
+          </TouchableOpacity>
 
           {/* Cheapest-nearby list */}
           <TouchableOpacity
@@ -981,7 +984,7 @@ export default function MapScreen() {
             ) : cheapestNearby.length === 0 ? (
               <Text style={[styles.cheapestEmpty, { color: colors.textMuted }]}>
                 Žádné stanice se zveřejněnou cenou
-                {networkFilter === 'zaspot' ? '. Zkuste přepnout na „Vše".' : ' v této oblasti.'}
+                {networkFilter === 'zaspot' ? `. Zkuste zrušit „${t.map.onlyZaspot}".` : ' v této oblasti.'}
               </Text>
             ) : (
               <ScrollView style={{ maxHeight: 420 }}>
@@ -1357,10 +1360,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 6,
   },
-  networkToggleBtn: {
+  onlyZaspotChip: {
+    alignItems: 'center',
+    gap: 6,
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 18,
+    paddingVertical: 8,
   },
   networkToggleText: {
     fontSize: 12,
