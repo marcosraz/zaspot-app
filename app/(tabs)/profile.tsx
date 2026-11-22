@@ -39,6 +39,7 @@ import {
   fetchRfidCards,
   registerRfidCard,
 } from '../../lib/vehicles';
+import { loadMapPrefs, saveMapPrefs, subscribeMapPrefs, DEFAULT_MAP_PREFS, type MapPrefs } from '../../lib/mapPreferences';
 import Constants from 'expo-constants';
 import { useFocusedInterval } from '../../hooks/useFocusedInterval';
 
@@ -97,6 +98,13 @@ export default function ProfileScreen() {
   } = useNotifications();
 
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  // Map preferences live outside React (lib/mapPreferences) so the map tab,
+  // which stays mounted, hears changes made here.
+  const [mapPrefs, setMapPrefs] = useState<MapPrefs>(DEFAULT_MAP_PREFS);
+  useEffect(() => {
+    loadMapPrefs().then(setMapPrefs);
+    return subscribeMapPrefs(setMapPrefs);
+  }, []);
   const [showVehicleSelector, setShowVehicleSelector] = useState(false);
   const [showCustomVehicle, setShowCustomVehicle] = useState(false);
   const [customVehName, setCustomVehName] = useState('');
@@ -422,6 +430,35 @@ export default function ProfileScreen() {
               value={currency === 'eur' ? 'EUR (€)' : 'CZK (Kč)'}
               onPress={toggleCurrency}
               iconColor={Colors.brand.accentGreen}
+            />
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            {/* Map: which stations it opens with (tap switches), and whether the
+                "Jen ZAspot" checkbox on the map itself updates this default. */}
+            <MenuItem
+              icon="map-outline"
+              label={t.profile.mapDefault}
+              value={mapPrefs.network === 'zaspot' ? t.profile.mapDefaultZaspot : t.profile.mapDefaultAll}
+              onPress={() => saveMapPrefs({ network: mapPrefs.network === 'zaspot' ? 'all' : 'zaspot' })}
+              iconColor="#06B6D4"
+            />
+
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+            <MenuItem
+              icon="bookmark-outline"
+              label={t.profile.mapRemember}
+              showArrow={false}
+              iconColor="#06B6D4"
+              rightElement={
+                <Switch
+                  value={mapPrefs.remember}
+                  onValueChange={(on) => { saveMapPrefs({ remember: on }); }}
+                  trackColor={{ false: '#D1D5DB', true: Colors.brand.accentGreen + '50' }}
+                  thumbColor={mapPrefs.remember ? Colors.brand.accentGreen : '#FFFFFF'}
+                />
+              }
             />
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />

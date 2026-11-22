@@ -217,6 +217,10 @@ export interface Translations {
     communityEnergy: string;
     eRoaming: string;
     currency: string;
+    mapDefault: string;
+    mapDefaultAll: string;
+    mapDefaultZaspot: string;
+    mapRemember: string;
     // Custom vehicle placeholders & validation
     maxPowerPlaceholder: string;
     macPlaceholder: string;
@@ -700,6 +704,10 @@ export const translations: Record<Language, Translations> = {
       communityEnergy: 'Komunitní energetika',
       eRoaming: 'eRoaming (Hubject)',
       currency: 'Měna',
+      mapDefault: 'Mapa: výchozí zobrazení',
+      mapDefaultAll: 'Všechny stanice',
+      mapDefaultZaspot: 'Jen ZAspot',
+      mapRemember: 'Pamatovat volbu na mapě',
       // Custom vehicle placeholders & validation
       maxPowerPlaceholder: 'Max. nabíjecí výkon kW (např. 150)',
       macPlaceholder: 'MAC (např. 98:ED:5C:89:BE:0E)',
@@ -1156,6 +1164,10 @@ export const translations: Record<Language, Translations> = {
       communityEnergy: 'Community Energy',
       eRoaming: 'eRoaming (Hubject)',
       currency: 'Currency',
+      mapDefault: 'Map: default view',
+      mapDefaultAll: 'All stations',
+      mapDefaultZaspot: 'ZAspot only',
+      mapRemember: 'Remember map choice',
       // Custom vehicle placeholders & validation
       maxPowerPlaceholder: 'Max. charging power kW (e.g. 150)',
       macPlaceholder: 'MAC (e.g. 98:ED:5C:89:BE:0E)',
@@ -1612,6 +1624,10 @@ export const translations: Record<Language, Translations> = {
       communityEnergy: 'Gemeinschaftsenergie',
       eRoaming: 'eRoaming (Hubject)',
       currency: 'Währung',
+      mapDefault: 'Karte: Standardansicht',
+      mapDefaultAll: 'Alle Stationen',
+      mapDefaultZaspot: 'Nur ZAspot',
+      mapRemember: 'Auswahl auf der Karte merken',
       // Custom vehicle placeholders & validation
       maxPowerPlaceholder: 'Max. Ladeleistung kW (z.B. 150)',
       macPlaceholder: 'MAC (z.B. 98:ED:5C:89:BE:0E)',
@@ -2068,6 +2084,10 @@ export const translations: Record<Language, Translations> = {
       communityEnergy: 'Energetyka społeczna',
       eRoaming: 'eRoaming (Hubject)',
       currency: 'Waluta',
+      mapDefault: 'Mapa: widok domyślny',
+      mapDefaultAll: 'Wszystkie stacje',
+      mapDefaultZaspot: 'Tylko ZAspot',
+      mapRemember: 'Zapamiętaj wybór na mapie',
       // Custom vehicle placeholders & validation
       maxPowerPlaceholder: 'Maks. moc ładowania kW (np. 150)',
       macPlaceholder: 'MAC (np. 98:ED:5C:89:BE:0E)',

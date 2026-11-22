@@ -36,6 +36,7 @@ import FavoriteButton from '../../components/FavoriteButton';
 import { LiveStationPrice } from '../../components/LiveStationPrice';
 import { loadPriceContext, getStationPriceCzk, sortByPrice, PriceContext } from '../../lib/stationPrices';
 import { calculateDistance } from '../../lib/routePlanner';
+import { loadMapPrefs, saveMapPrefs, subscribeMapPrefs } from '../../lib/mapPreferences';
 
 // Diakritika-unempfindlich: "popuvky" findet auch "Popůvky"
 const normalizeText = (s: string) =>
@@ -71,7 +72,34 @@ export default function MapScreen() {
   const [empLoading, setEmpLoading] = useState(false);
   // Default 'all': the map opens with every station nearby (ZAspot + Hubject
   // roaming + public directory). 'zaspot' is the opt-in "Jen ZAspot" checkbox.
+  // The stored preference (lib/mapPreferences) replaces this once it is read.
   const [networkFilter, setNetworkFilter] = useState<'zaspot' | 'all'>('all');
+  // False until the stored preference is known — holds back the first roaming
+  // fetch so a "Jen ZAspot" user doesn't download the CZ seed for nothing.
+  const [prefsReady, setPrefsReady] = useState(false);
+  const rememberRef = useRef(true);
+
+  useEffect(() => {
+    let alive = true;
+    loadMapPrefs().then((p) => {
+      if (!alive) return;
+      rememberRef.current = p.remember;
+      setNetworkFilter(p.network);
+      setPrefsReady(true);
+    });
+    // Profile → Settings changes the default while this screen stays mounted.
+    const unsubscribe = subscribeMapPrefs((p) => {
+      rememberRef.current = p.remember;
+      setNetworkFilter(p.network);
+    });
+    return () => { alive = false; unsubscribe(); };
+  }, []);
+
+  // The map checkbox: applies at once; stored only while "remember" is on.
+  const chooseNetwork = (next: 'zaspot' | 'all') => {
+    if (rememberRef.current) saveMapPrefs({ network: next });
+    else setNetworkFilter(next);
+  };
   const [isOffline, setIsOffline] = useState(false);
   const [cacheInfo, setCacheInfo] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -166,6 +194,8 @@ export default function MapScreen() {
     price_per_kwh: s.price_per_kwh,
     price_currency: s.currency,
     price_czk_kwh: s.price_czk_kwh,
+    price_min_czk: s.price_min_czk,
+    min_fee_after_min: s.min_fee_after_min,
     available: s.status === 'available',
     status: s.status === 'available' ? 'operational' : 'offline',
     operator: s.operator,
@@ -233,7 +263,7 @@ export default function MapScreen() {
   // again once the map reports 'loaded' — only then can requestBounds() answer
   // with the real viewport. Also seeds a wide CZ box while zoomed out.
   useEffect(() => {
-    if (networkFilter !== 'all') return;
+    if (!prefsReady || networkFilter !== 'all') return;
     if (mapStatus === 'loaded') {
       webViewRef.current?.injectJavaScript('window.requestBounds && window.requestBounds(); true;');
     }
@@ -242,7 +272,7 @@ export default function MapScreen() {
       // country is populated even before the first zoom-in.
       loadEmpForBounds({ west: 12.0, south: 48.5, east: 18.9, north: 51.1 });
     }
-  }, [networkFilter, mapStatus, loadEmpForBounds]);
+  }, [prefsReady, networkFilter, mapStatus, loadEmpForBounds]);
 
   const hasActiveFilters = filters.dcOnly || filters.acOnly || filters.availableOnly
     || filters.favoritesOnly || filters.freeParking || filters.connectorType !== null
@@ -373,7 +403,7 @@ export default function MapScreen() {
   const handleRoamingStart = (station: ChargingStation) => {
     const evses = station.emp_evses ?? [];
     const repId = String(station.id).replace(/^emp-/, '');
-    const note = 'Částka se odečte z vašeho ZAspot kreditu po nabití (cena operátora + roaming). Minimální kredit: 200 Kč.';
+    const note = 'Částka se odečte z vašeho ZAspot kreditu po nabití. Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč.';
     const startOn = async (evseId: string, connectorSelected: boolean) => {
             setEmpStarting(true);
             const res = await empRemoteStart(evseId, { connectorSelected });
@@ -698,7 +728,7 @@ export default function MapScreen() {
               styles.onlyZaspotChip,
               { backgroundColor: networkFilter === 'zaspot' ? Colors.brand.accentGreen : colors.surface },
             ]}
-            onPress={() => setNetworkFilter(networkFilter === 'zaspot' ? 'all' : 'zaspot')}
+            onPress={() => chooseNetwork(networkFilter === 'zaspot' ? 'all' : 'zaspot')}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: networkFilter === 'zaspot' }}
             accessibilityLabel={t.map.onlyZaspot}
@@ -889,6 +919,15 @@ export default function MapScreen() {
               <Text style={[styles.statBoxLabel, { color: colors.textMuted }]}>{t.map.connectors}</Text>
             </View>
           </View>
+
+          {/* Roaming: the kWh price above already includes our markup; some
+              operators add a per-minute fee on top — say so before the start. */}
+          {isEmpStation(selectedStation) && (selectedStation.price_min_czk ?? 0) > 0 && (
+            <Text style={[styles.externalNote, { color: colors.textMuted }]}>
+              + {selectedStation.price_min_czk!.toFixed(2)} Kč/min
+              {(selectedStation.min_fee_after_min ?? 0) > 0 ? ` od ${selectedStation.min_fee_after_min}. minuty` : ''} (poplatek operátora)
+            </Text>
+          )}
 
           {/* Connectors */}
           {selectedStation.connector_types && selectedStation.connector_types.length > 0 && (

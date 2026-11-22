@@ -532,8 +532,13 @@ export interface EmpStation {
   price_per_kwh: number | null;
   /** Currency of price_per_kwh as published by the CPO via Hubject ('EUR', 'CZK', 'PLN', …). */
   currency: string | null;
-  /** Server-side CZK conversion of price_per_kwh (all currencies). */
+  /** What the customer pays per kWh in CZK — CPO price incl. VAT plus the
+   *  roaming markup, resolved server-side like the billing (operator tariff
+   *  first, so it can be set while price_per_kwh is null). */
   price_czk_kwh: number | null;
+  /** Per-minute fee the CPO adds on top (CZK), and after how many minutes. */
+  price_min_czk: number | null;
+  min_fee_after_min: number | null;
   /** With group=location: number of charge points at this physical site (else 1). */
   evse_count: number;
   /** All charge points at the site (group=location); empty on older servers. */
@@ -567,6 +572,8 @@ function adaptEmpStation(raw: any): EmpStation {
     price_per_kwh: typeof raw?.price_per_kwh === 'number' ? raw.price_per_kwh : null,
     currency: typeof raw?.currency === 'string' && raw.currency ? raw.currency.toUpperCase() : null,
     price_czk_kwh: typeof raw?.price_czk_kwh === 'number' ? raw.price_czk_kwh : null,
+    price_min_czk: typeof raw?.price_min_czk === 'number' && raw.price_min_czk > 0 ? raw.price_min_czk : null,
+    min_fee_after_min: typeof raw?.min_fee_after_min === 'number' ? raw.min_fee_after_min : null,
     evse_count: typeof raw?.evse_count === 'number' && raw.evse_count > 0 ? raw.evse_count : 1,
     evses: Array.isArray(raw?.evses)
       ? raw.evses

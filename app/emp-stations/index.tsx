@@ -289,8 +289,16 @@ export default function EmpStationsScreen() {
                 <View style={styles.specsRow}>
                   <Spec icon="flash" label={`${s.max_power_kw} kW`} colors={colors} />
                   <Spec icon="hardware-chip" label={s.connectors.map((c) => c.type).join(', ') || '–'} colors={colors} />
-                  {s.price_per_kwh != null && (
-                    <Spec icon="cash" label={s.price_czk_kwh != null ? `${s.price_czk_kwh.toFixed(2)} Kč/kWh` : `${s.price_per_kwh.toFixed(2)} ${s.currency ?? ''}/kWh`} colors={colors} highlight />
+                  {(s.price_czk_kwh != null || s.price_per_kwh != null) && (
+                    <Spec
+                      icon="cash"
+                      label={
+                        (s.price_czk_kwh != null ? `${s.price_czk_kwh.toFixed(2)} Kč/kWh` : `${s.price_per_kwh!.toFixed(2)} ${s.currency ?? ''}/kWh`) +
+                        (s.price_min_czk ? ` + ${s.price_min_czk.toFixed(2)} Kč/min` : '')
+                      }
+                      colors={colors}
+                      highlight
+                    />
                   )}
                 </View>
 
@@ -333,9 +341,11 @@ export default function EmpStationsScreen() {
                   </Text>
                 </View>
                 <View style={styles.modalPriceItem}>
-                  <Text style={[styles.modalPriceLabel, { color: colors.textMuted }]}>Cena operátora</Text>
+                  <Text style={[styles.modalPriceLabel, { color: colors.textMuted }]}>Cena vč. roamingu</Text>
                   <Text style={[styles.modalPriceValue, { color: Colors.brand.accentGreen }]}>
-                    {selected?.price_czk_kwh != null ? `${selected.price_czk_kwh.toFixed(2)} Kč/kWh${selected.currency && selected.currency !== 'CZK' ? ` (${selected.price_per_kwh?.toFixed(2)} ${selected.currency})` : ''}` : selected?.price_per_kwh != null ? `${selected.price_per_kwh.toFixed(2)} ${selected.currency ?? ''}/kWh` : 'dle CDR'}
+                    {selected?.price_czk_kwh != null
+                      ? `${selected.price_czk_kwh.toFixed(2)} Kč/kWh${selected.price_min_czk ? ` + ${selected.price_min_czk.toFixed(2)} Kč/min` : ''}`
+                      : selected?.price_per_kwh != null ? `${selected.price_per_kwh.toFixed(2)} ${selected.currency ?? ''}/kWh` : 'dle CDR'}
                   </Text>
                 </View>
               </View>
@@ -371,8 +381,8 @@ export default function EmpStationsScreen() {
               )}
 
               <Text style={[styles.modalNote, { color: colors.textMuted }]}>
-                Částka se odečte z vašeho ZAspot kreditu po ukončení nabíjení
-                (cena operátora + malá přirážka za roaming). Minimální kredit: 200 Kč.
+                Částka se odečte z vašeho ZAspot kreditu po ukončení nabíjení.
+                Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč.
               </Text>
 
               {startError && (
