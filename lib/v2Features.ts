@@ -667,8 +667,9 @@ export async function empRemoteStart(
     balance_czk?: number;
     min_balance_czk?: number;
     /** Why the start failed (502): 'emp_not_activated' = Hubject has not activated
-     *  our EMP account yet, 'hubject_rejected' | 'operator_rejected' otherwise. */
-    reason?: 'emp_not_activated' | 'hubject_rejected' | 'operator_rejected' | 'outstanding_debt';
+     *  our EMP account yet, 'no_ev_connected' = the operator wants the cable in the
+     *  car before the start, 'hubject_rejected' | 'operator_rejected' otherwise. */
+    reason?: 'emp_not_activated' | 'no_ev_connected' | 'hubject_rejected' | 'operator_rejected' | 'outstanding_debt';
     /** 402 with reason 'outstanding_debt': what is still owed from earlier charges. */
     debt_czk?: number;
     hubject_code?: string | null;

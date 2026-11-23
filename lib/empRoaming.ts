@@ -51,6 +51,10 @@ export function remoteStartErrorMessage(data: { reason?: string; hubject_code?: 
     // exists, but the operator has not yet created CZ-ZAS in their system.
     return 'Tento operátor zatím nemá ZAspot ve svém systému aktivovaný (nové partnerství, aktivace probíhá). Zkuste jinou stanici nebo to zopakujte za pár dní.';
   }
+  if (data?.reason === 'no_ev_connected') {
+    // OICP 510: this operator only accepts a start once the cable is in the car.
+    return 'Stanice nevidí připojené vozidlo. Nejdřív zapojte kabel do auta a potom spusťte nabíjení znovu.';
+  }
   if (data?.reason === 'hubject_rejected') {
     return `Roamingová platforma požadavek odmítla (kód ${data.hubject_code ?? '?'}). Zkuste to znovu nebo vyberte jinou stanici.`;
   }
