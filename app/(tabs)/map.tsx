@@ -403,7 +403,7 @@ export default function MapScreen() {
   const handleRoamingStart = (station: ChargingStation) => {
     const evses = station.emp_evses ?? [];
     const repId = String(station.id).replace(/^emp-/, '');
-    const note = 'Částka se odečte z vašeho ZAspot kreditu po nabití. Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč.';
+    const note = 'Částka se odečte z vašeho ZAspot kreditu po nabití. Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč (AC), 500–800 Kč (DC).';
     const startOn = async (evseId: string, connectorSelected: boolean) => {
             setEmpStarting(true);
             const res = await empRemoteStart(evseId, { connectorSelected });
@@ -418,9 +418,18 @@ export default function MapScreen() {
                 { text: 'Zrušit', style: 'cancel' },
                 { text: 'Přihlásit se', onPress: () => router.push('/(auth)/login') },
               ]);
+            } else if (res.status === 402 && res.data?.reason === 'outstanding_debt') {
+              Alert.alert(
+                'Nedoplatek',
+                `Z předchozího nabíjení zbývá doplatit ${(res.data.debt_czk ?? 0).toFixed(2).replace('.', ',')} Kč. Po dobití kreditu se strhne automaticky a nabíjení bude znovu možné.`,
+                [
+                  { text: 'Zrušit', style: 'cancel' },
+                  { text: 'Dobít kredit', onPress: () => router.push('/top-up') },
+                ]
+              );
             } else if (res.status === 402) {
               const min = res.data?.min_balance_czk ?? 200;
-              Alert.alert('Nedostatečný kredit', `Pro roaming je potřeba alespoň ${min} Kč.`);
+              Alert.alert('Nedostatečný kredit', `Pro roaming na této stanici je potřeba alespoň ${min} Kč.`);
             } else if (res.status === 409) {
               Alert.alert('Aktivní nabíjení', 'Už máte aktivní roamingové nabíjení.');
               router.push('/emp-stations');

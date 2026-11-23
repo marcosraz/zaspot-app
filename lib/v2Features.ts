@@ -668,7 +668,9 @@ export async function empRemoteStart(
     min_balance_czk?: number;
     /** Why the start failed (502): 'emp_not_activated' = Hubject has not activated
      *  our EMP account yet, 'hubject_rejected' | 'operator_rejected' otherwise. */
-    reason?: 'emp_not_activated' | 'hubject_rejected' | 'operator_rejected';
+    reason?: 'emp_not_activated' | 'hubject_rejected' | 'operator_rejected' | 'outstanding_debt';
+    /** 402 with reason 'outstanding_debt': what is still owed from earlier charges. */
+    debt_czk?: number;
     hubject_code?: string | null;
     hubject_description?: string | null;
     /** EVSE the server actually started on (may differ: free-sibling fallback). */
@@ -756,6 +758,8 @@ export interface EmpReceipt {
   markupCzkKwh: number | null;
   markupCostCzk: number | null;
   totalCzk: number | null;
+  /** Part of totalCzk still unpaid (0 = paid, null = not billed yet / older server). */
+  shortfallCzk?: number | null;
   totalNetCzk: number | null;
   vatCzk: number | null;
   billedAt: string | null;

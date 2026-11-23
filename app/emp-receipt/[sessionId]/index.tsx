@@ -74,7 +74,13 @@ export default function EmpReceiptScreen() {
     ['   × energie', czk(r.markupCostCzk)],
     ['Základ daně', czk(r.totalNetCzk)],
     ['DPH 21 %', czk(r.vatCzk)],
-    ['Celkem odečteno z kreditu', czk(r.totalCzk), true],
+    ...((r.shortfallCzk ?? 0) > 0
+      ? ([
+          ['Celkem', czk(r.totalCzk), true],
+          ['Uhrazeno z kreditu', czk((r.totalCzk ?? 0) - (r.shortfallCzk ?? 0))],
+          ['Zbývá doplatit', czk(r.shortfallCzk ?? 0), true],
+        ] as Array<[string, string, boolean?]>)
+      : ([['Celkem odečteno z kreditu', czk(r.totalCzk), true]] as Array<[string, string, boolean?]>)),
   ];
 
   const buildHtml = (r: EmpReceipt) => {
@@ -170,8 +176,15 @@ ${rows(r).map(line).join('')}</div>
           </View>
 
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
-            {receipt.status === 'billed' ? (
-              priceRows(receipt).map(([k, v, bold]) => <Row key={k} k={k} v={v} bold={bold} />)
+            {receipt.status === 'billed' || (receipt.status === 'insufficient_credit' && receipt.totalCzk != null) ? (
+              <>
+                {priceRows(receipt).map(([k, v, bold]) => <Row key={k} k={k} v={v} bold={bold} />)}
+                {(receipt.shortfallCzk ?? 0) > 0 && (
+                  <Text style={{ color: '#DC2626', fontSize: 13, lineHeight: 18, marginTop: 8 }}>
+                    Nedoplatek se strhne automaticky při příštím dobití kreditu. Do té doby nelze zahájit další nabíjení.
+                  </Text>
+                )}
+              </>
             ) : (
               <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 18 }}>
                 {receipt.status === 'no_price'

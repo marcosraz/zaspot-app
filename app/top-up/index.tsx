@@ -24,6 +24,7 @@ import { Stack } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useTheme } from '../../context/ThemeContext';
 import { useCredit } from '../../context/CreditContext';
+import DebtBanner from '../../components/DebtBanner';
 import { useCurrency } from '../../context/CurrencyContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Colors } from '../../constants/colors';
@@ -213,6 +214,9 @@ export default function TopUpScreen() {
             <RefreshControl refreshing={pendingLoading} onRefresh={reloadPending} tintColor={Colors.brand.accentGreen} />
           ) : undefined}
         >
+          {/* Open debt: this top-up pays it off first */}
+          <DebtBanner showTopUpButton={false} />
+
           {/* Balance card */}
           <View style={[styles.balanceCard, { backgroundColor: colors.surface, borderColor: colors.borderLight }]}>
             <Text style={[styles.balanceLabel, { color: colors.textMuted }]}>Aktuální zůstatek</Text>

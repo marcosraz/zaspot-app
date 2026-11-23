@@ -25,6 +25,9 @@ export interface CreditTransaction {
 
 interface CreditContextType {
   balance: number;
+  /** Unpaid remainder of earlier charges (CZK). The server takes it from the
+   *  next top-up first; while it is > 0 no charge can start. */
+  debt: number;
   balanceFormatted: string;
   loading: boolean;
   refreshBalance: () => Promise<void>;
@@ -51,6 +54,7 @@ interface CreditProviderProps {
 export function CreditProvider({ children }: CreditProviderProps) {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [balance, setBalance] = useState(0);
+  const [debt, setDebt] = useState(0);
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
@@ -100,7 +104,7 @@ export function CreditProvider({ children }: CreditProviderProps) {
   const fetchBalance = async (): Promise<number | null> => {
     setLoading(true);
     try {
-      const res = await apiFetch<{ success: boolean; balance_czk: number; user_id: string }>(
+      const res = await apiFetch<{ success: boolean; balance_czk: number; debt_czk?: number; user_id: string }>(
         '/payment/balance',
         { requireAuth: true }
       );
@@ -108,6 +112,7 @@ export function CreditProvider({ children }: CreditProviderProps) {
         const value = res.data.balance_czk || 0;
         balanceRef.current = value;
         setBalance(value);
+        setDebt(res.data.debt_czk && res.data.debt_czk > 0 ? res.data.debt_czk : 0);
         return value;
       }
       return null;
@@ -246,6 +251,7 @@ export function CreditProvider({ children }: CreditProviderProps) {
     <CreditContext.Provider
       value={{
         balance,
+        debt,
         balanceFormatted,
         loading,
         refreshBalance,

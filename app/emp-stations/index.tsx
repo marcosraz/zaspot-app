@@ -139,11 +139,16 @@ export default function EmpStationsScreen() {
     if (res.ok && res.data?.success) {
       setSelected(null);
       await refreshSession();
+    } else if (res.status === 402 && res.data?.reason === 'outstanding_debt') {
+      setStartError(
+        `Z předchozího nabíjení zbývá doplatit ${(res.data.debt_czk ?? 0).toFixed(2).replace('.', ',')} Kč. ` +
+          'Dobijte kredit — nedoplatek se strhne automaticky a nabíjení bude znovu možné.'
+      );
     } else if (res.status === 402) {
       const min = res.data?.min_balance_czk ?? 200;
       const bal = res.data?.balance_czk;
       setStartError(
-        `Nedostatečný kredit. Pro roaming je potřeba alespoň ${min} Kč` +
+        `Nedostatečný kredit. Pro roaming na této stanici je potřeba alespoň ${min} Kč` +
           (bal != null ? ` (máte ${bal.toFixed(0)} Kč).` : '.')
       );
     } else if (res.status === 409) {
@@ -382,7 +387,7 @@ export default function EmpStationsScreen() {
 
               <Text style={[styles.modalNote, { color: colors.textMuted }]}>
                 Částka se odečte z vašeho ZAspot kreditu po ukončení nabíjení.
-                Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč.
+                Zobrazená cena už obsahuje roamingovou přirážku. Minimální kredit: 200 Kč (AC), 500–800 Kč (DC).
               </Text>
 
               {startError && (

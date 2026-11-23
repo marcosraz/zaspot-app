@@ -23,6 +23,7 @@ import { useFavorites } from '../../context/FavoritesContext';
 import { useNotifications } from '../../context/NotificationsContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { Colors } from '../../constants/colors';
+import DebtBanner from '../../components/DebtBanner';
 import { Layout } from '../../constants/layout';
 import { useTabBarScrollPadding } from '../../hooks/useTabBarHeight';
 import { fetchSpotPrices, getCurrentSlot, getPriceColor, DailyPrices } from '../../lib/spotPrices';
@@ -229,6 +230,9 @@ export default function HomeScreen() {
           />
         }
       >
+        {/* Open debt from an earlier charge — explains a zero balance after a top-up */}
+        <DebtBanner />
+
         {/* Header */}
         <View style={styles.header}>
           <View>
