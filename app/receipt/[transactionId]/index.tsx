@@ -157,7 +157,7 @@ export default function ReceiptScreen() {
   </div>
 
   <div class="footer">
-    ${r.zaspotInvoiceName ?? 'Zaspot SBA'} · IČO 09873236 · DIČ CZ09873236<br/>
+    ${r.zaspotInvoiceName ?? 'ZAspot.eu - S.B.A.'} · IČO 09873236 · DIČ CZ09873236<br/>
     Štefánikova 605/46b, 612 00 Brno · zaspot.cz
   </div>
 </body>
